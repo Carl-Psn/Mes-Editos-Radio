@@ -17,7 +17,7 @@ CATEGORIES = ("politique", "eco", "geopolitique", "invite", "autre")
 PRIORITY_LABELS = {
     1: "1 - Secondaire",
     2: "2 - Important",
-    3: "3 - Incontournable INSP",
+    3: "3 - Incontournable",
 }
 DEFAULT_PRIORITY = 1
 
