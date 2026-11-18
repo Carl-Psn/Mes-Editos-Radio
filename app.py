@@ -25,6 +25,8 @@ import ai_engine
 import database as db
 import exporter
 import fiche_import
+import richtext_md as rt
+from streamlit_quill import st_quill
 import rss_fetcher
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -72,6 +74,14 @@ MIN_PRIORITY_LABELS = {
     1: "Toutes les priorités (1 à 3)",
 }
 FICHE_FILTERS = ("Tous", "À ficher", "Fichés")
+FICHE_EDITOR_TOOLBAR = [
+    ["bold", "italic", "underline"],
+    [{"color": []}],
+    [{"header": [1, 2, False]}],
+    ["blockquote"],
+    [{"list": "bullet"}, {"indent": "-1"}, {"indent": "+1"}],
+    ["clean"],
+]
 
 # Valeurs de widgets à conserver quand leur onglet n'est pas affiché (les onglets sont rendus à la demande).
 PERSISTENT_KEYS = (
@@ -719,8 +729,11 @@ def render_workspace(ep: dict[str, Any]) -> None:
     saved = (ep["fiche"] or "").strip()
     draft = (ep["fiche_draft"] or "").strip()
     version = st.session_state.get(f"fiche_version_{ep['id']}", 0)
-    editor_key = f"fiche_editor_{ep['id']}_{version}"
-    text = st.session_state.get(editor_key, draft or saved)
+    body_key = f"fiche_body_{ep['id']}_{version}"
+    widget_key = f"fiche_editor_widget_{ep['id']}_{version}"
+    reset_editor = body_key not in st.session_state
+    if reset_editor:
+        st.session_state[body_key] = rt.markdown_to_html(draft or saved)
 
     if draft:
         render_html(f'<div class="callout callout-draft">{icon("sparkles")}<span><b>Brouillon généré par l\'IA, non enregistré.</b> '
@@ -826,14 +839,20 @@ def render_workspace(ep: dict[str, Any]) -> None:
 
     preview_tab, edit_tab = st.tabs(["Fiche", "Modifier le texte"])
     with edit_tab:
-        st.text_area(
-            "Texte de la fiche (Markdown)",
-            value=draft or saved,
-            height=460,
-            key=editor_key,
-            placeholder="## 1. Thèse centrale et problématique\n\n## 2. Faits, chiffres précis et dates clés\n\n"
-            "## 3. Acteurs, institutions et rapports de force\n\n## 4. Enjeux pour l'action publique et ouverture concours",
+        st.caption(
+            "Éditeur visuel : **gras** · *italique* · souligné · couleur · style (Normal / Titre 1 / Titre 2 / "
+            "citation) · listes à puces sur trois niveaux (●, ○, ■ via les boutons retrait / avancée). "
+            "Pas besoin de connaître le Markdown."
         )
+        html_value = st_quill(
+            value=st.session_state[body_key],
+            html=True,
+            toolbar=FICHE_EDITOR_TOOLBAR,
+            key=widget_key,
+        )
+        if html_value is not None:
+            st.session_state[body_key] = html_value
+    text = rt.html_to_markdown(st.session_state.get(body_key, ""))
     with preview_tab:
         if text.strip():
             with st.container(key=f"fiche_preview_{ep['id']}"):
@@ -842,7 +861,7 @@ def render_workspace(ep: dict[str, Any]) -> None:
             sections = "".join(f'<div class="plan-item">{esc(section)}</div>' for section in ai_engine.FICHE_SECTIONS)
             render_html(f'<div class="fiche-plan"><div class="fiche-plan-title">{icon("layers")}Plan de la fiche</div>'
                     f'{sections}<div class="fiche-plan-note">Générez la fiche depuis la retranscription, importez un '
-                    f'fichier Markdown/PDF, ou rédigez dans l\'onglet « Modifier le texte ».</div></div>')
+                    f'fichier PDF/Markdown, ou rédigez avec l\'éditeur visuel dans l\'onglet « Modifier le texte ».</div></div>')
 
     dirty = text.strip() != saved
     save_col, discard_col, delete_col = st.columns([1.5, 1.5, 1.2])

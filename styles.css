@@ -120,6 +120,13 @@
   color: var(--inter-red);
 }
 
+/* ---------------------------------------------------------- éditeur de fiche */
+
+[data-testid="stCustomComponentV1"] iframe {
+  width: 100%;
+  border: none;
+}
+
 /* -------------------------------------------------------------------- cartes */
 
 [class*="st-key-card_"],
