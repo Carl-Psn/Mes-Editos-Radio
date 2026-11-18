@@ -172,7 +172,18 @@ def _count_label(episodes: list[dict[str, Any]]) -> str:
 
 # ------------------------------------------------------------- mini-analyseur Markdown
 
-Run = tuple[str, bool, bool]  # (texte, gras, italique)
+Run = tuple[str, bool, bool, bool, str | None]  # texte, gras, italique, souligné, couleur (#rrggbb)
+
+
+def _run(
+    text: str,
+    *,
+    bold: bool = False,
+    italic: bool = False,
+    underline: bool = False,
+    color: str | None = None,
+) -> Run:
+    return text, bold, italic, underline, color
 
 
 @dataclass
@@ -184,13 +195,16 @@ class Block:
 
 
 _INLINE_RE = re.compile(
-    r"\*\*\*(?=\S)(.+?)(?<=\S)\*\*\*"
-    r"|\*\*(?=\S)(.+?)(?<=\S)\*\*"
-    r"|__(?=\S)(.+?)(?<=\S)__"
-    r"|\*(?=\S)(.+?)(?<=\S)\*"
-    r"|(?<!\w)_(?=\S)(.+?)(?<=\S)_(?!\w)"
-    r"|`([^`]+)`"
-    r"|\[([^\]]+)\]\((https?://[^)\s]+)\)"
+    r"<u>(?P<u>.+?)</u>"
+    r"|<span\s+style=['\"]color:\s*(?P<color>[^;'\"]+)['\"]\s*>(?P<c>.+?)</span>"
+    r"|\*\*\*(?=\S)(?P<bi>.+?)(?<=\S)\*\*\*"
+    r"|\*\*(?=\S)(?P<b>.+?)(?<=\S)\*\*"
+    r"|__(?=\S)(?P<b_alt>.+?)(?<=\S)__"
+    r"|\*(?=\S)(?P<i>.+?)(?<=\S)\*"
+    r"|(?<!\w)_(?=\S)(?P<i_alt>.+?)(?<=\S)_(?!\w)"
+    r"|`(?P<code>[^`]+)`"
+    r"|\[(?P<link_text>[^\]]+)\]\((?P<link_url>https?://[^)\s]+)\)",
+    re.DOTALL,
 )
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$")
 _BULLET_RE = re.compile(r"^(\s*)[-*+•]\s+(.*)$")
@@ -199,27 +213,65 @@ _RULE_RE = re.compile(r"^(-{3,}|\*{3,}|_{3,})$")
 _TABLE_SEPARATOR_RE = re.compile(r"^\|?[\s:|-]+\|?$")
 
 
-def parse_inline(text: str, bold: bool = False, italic: bool = False) -> list[Run]:
+def parse_inline(
+    text: str,
+    bold: bool = False,
+    italic: bool = False,
+    underline: bool = False,
+    color: str | None = None,
+) -> list[Run]:
     runs: list[Run] = []
     position = 0
     for match in _INLINE_RE.finditer(text):
         if match.start() > position:
-            runs.append((text[position : match.start()], bold, italic))
-        both, strong, strong_alt, emphasis, emphasis_alt, code, link_text, link_url = match.groups()
-        if both is not None:
-            runs.extend(parse_inline(both, True, True))
-        elif strong is not None or strong_alt is not None:
-            runs.extend(parse_inline(strong if strong is not None else strong_alt, True, italic))
-        elif emphasis is not None or emphasis_alt is not None:
-            runs.extend(parse_inline(emphasis if emphasis is not None else emphasis_alt, bold, True))
-        elif code is not None:
-            runs.append((code, bold, italic))
+            runs.append(_run(text[position : match.start()], bold=bold, italic=italic, underline=underline, color=color))
+        groups = match.groupdict()
+        if groups["u"] is not None:
+            runs.extend(parse_inline(groups["u"], bold=bold, italic=italic, underline=True, color=color))
+        elif groups["c"] is not None:
+            run_color = _normalize_inline_color(groups["color"] or "") or color
+            runs.extend(parse_inline(groups["c"], bold=bold, italic=italic, underline=underline, color=run_color))
+        elif groups["bi"] is not None:
+            runs.extend(parse_inline(groups["bi"], bold=True, italic=True, underline=underline, color=color))
+        elif groups["b"] is not None or groups["b_alt"] is not None:
+            inner = groups["b"] if groups["b"] is not None else groups["b_alt"]
+            runs.extend(parse_inline(inner, bold=True, italic=italic, underline=underline, color=color))
+        elif groups["i"] is not None or groups["i_alt"] is not None:
+            inner = groups["i"] if groups["i"] is not None else groups["i_alt"]
+            runs.extend(parse_inline(inner, bold=bold, italic=True, underline=underline, color=color))
+        elif groups["code"] is not None:
+            runs.append(_run(groups["code"], bold=bold, italic=italic, underline=underline, color=color))
         else:
-            runs.append((f"{link_text} ({link_url})", bold, italic))
+            runs.append(
+                _run(
+                    f'{groups["link_text"]} ({groups["link_url"]})',
+                    bold=bold,
+                    italic=italic,
+                    underline=underline,
+                    color=color,
+                )
+            )
         position = match.end()
     if position < len(text):
-        runs.append((text[position:], bold, italic))
+        runs.append(_run(text[position:], bold=bold, italic=italic, underline=underline, color=color))
     return [run for run in runs if run[0]]
+
+
+def _normalize_inline_color(value: str) -> str | None:
+    value = value.strip()
+    if not value:
+        return None
+    if value.startswith("#"):
+        rgb = value[1:]
+        if len(rgb) == 3:
+            return "#" + "".join(ch * 2 for ch in rgb)
+        if len(rgb) == 6:
+            return f"#{rgb.lower()}"
+        return None
+    match = re.match(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", value, re.I)
+    if match:
+        return "#{:02x}{:02x}{:02x}".format(*(int(match.group(i)) for i in range(1, 4)))
+    return None
 
 
 def parse_markdown(text: str) -> list[Block]:
@@ -362,12 +414,14 @@ def _docx_bottom_border(paragraph: Any, hex_color: str, size: int = 8) -> None:
 
 
 def _docx_runs(paragraph: Any, runs: list[Run], color: str | None = None, size: float | None = None) -> None:
-    for text, bold, italic in runs:
+    for text, bold, italic, underline, run_color in runs:
         run = paragraph.add_run(text)
         run.bold = bold or None
         run.italic = italic or None
-        if color:
-            run.font.color.rgb = RGBColor(*_rgb(color))
+        run.underline = underline or None
+        chosen = run_color or color
+        if chosen:
+            run.font.color.rgb = RGBColor(*_rgb(chosen))
         if size:
             run.font.size = Pt(size)
 
@@ -391,8 +445,11 @@ def _docx_markdown(document: Any, markdown: str, heading_color: str) -> None:
     for block in parse_markdown(markdown):
         if block.kind == "heading":
             paragraph = document.add_heading(level=2 if block.level <= 2 else 3)
-            _docx_runs(paragraph, [(text, False, italic) for text, _bold, italic in block.runs],
-                       color=heading_color if block.level <= 2 else INK)
+            _docx_runs(
+                paragraph,
+                [_run(text, italic=italic) for text, _bold, italic, _underline, _color in block.runs],
+                color=heading_color if block.level <= 2 else INK,
+            )
         elif block.kind == "bullet":
             style = ("List Bullet", "List Bullet 2", "List Bullet 3")[block.level]
             _docx_runs(document.add_paragraph(style=style), block.runs)
@@ -402,11 +459,11 @@ def _docx_markdown(document: Any, markdown: str, heading_color: str) -> None:
             paragraph.paragraph_format.left_indent = indent
             paragraph.paragraph_format.first_line_indent = -Cm(0.63)
             paragraph.paragraph_format.space_after = Pt(3)
-            _docx_runs(paragraph, [(f"{block.marker} ", False, False), *block.runs])
+            _docx_runs(paragraph, [_run(f"{block.marker} "), *block.runs])
         elif block.kind == "quote":
             paragraph = document.add_paragraph()
             paragraph.paragraph_format.left_indent = Cm(0.8)
-            _docx_runs(paragraph, [(text, bold, True) for text, bold, _italic in block.runs], color=MUTED)
+            _docx_runs(paragraph, [_run(text, bold=bold, italic=True) for text, bold, _italic, _u, _c in block.runs], color=MUTED)
         else:
             paragraph = document.add_paragraph()
             paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -417,7 +474,7 @@ def _docx_entry(document: Any, entry: FicheEntry) -> None:
     kicker = _docx_text(document, entry.show.upper(), size=9, color=entry.color, bold=True, after=2)
     kicker.paragraph_format.keep_with_next = True
     title = document.add_heading(level=1)
-    _docx_runs(title, [(entry.title, False, False)])
+    _docx_runs(title, [_run(entry.title)])
     meta = _docx_text(document, entry.meta, size=9.5, color=MUTED, after=6)
     meta.paragraph_format.keep_with_next = True
     if entry.summary:
@@ -485,8 +542,8 @@ def build_docx(doc: ExportDocument) -> bytes:
                 line = document.add_paragraph()
                 line.paragraph_format.space_after = Pt(2)
                 line.paragraph_format.left_indent = Cm(0.4)
-                _docx_runs(line, [(f"{entry.date_label}  ", False, False)], color=MUTED, size=10)
-                _docx_runs(line, [(entry.title, False, False)], size=10)
+                _docx_runs(line, [_run(f"{entry.date_label}  ")], color=MUTED, size=10)
+                _docx_runs(line, [_run(entry.title)], size=10)
         first_block = False
 
     if doc.synthesis:
@@ -494,7 +551,7 @@ def build_docx(doc: ExportDocument) -> bytes:
             page_break()
         _docx_text(document, "SYNTHÈSE MENSUELLE", size=9, color=ACCENT, bold=True, after=2)
         title = document.add_heading(level=1)
-        _docx_runs(title, [(doc.synthesis_title, False, False)])
+        _docx_runs(title, [_run(doc.synthesis_title)])
         _docx_bottom_border(title, RULE, size=6)
         _docx_markdown(document, doc.synthesis, ACCENT)
         first_block = False
@@ -618,8 +675,9 @@ class _Pdf(FPDF):
             self.ln(after)
 
     def runs(self, runs: list[Run], size: float, color: str, line_height: float, force_italic: bool = False) -> None:
-        for text, bold, italic in runs:
-            self.ink(("B" if bold else "") + ("I" if italic or force_italic else ""), size, color)
+        for text, bold, italic, underline, run_color in runs:
+            style = ("B" if bold else "") + ("I" if italic or force_italic else "") + ("U" if underline else "")
+            self.ink(style, size, run_color or color)
             self.write(line_height, self.clean(text))
         self.ln(line_height)
 

@@ -41,6 +41,8 @@ Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche ex
   retiennent par défaut les priorités 2 et 3 ; ce seuil se règle dans le module d'export.
 - Les fiches IA s'appuient par défaut sur la **retranscription** de la page `radiofrance.fr` de l'épisode (plus rapide que l'audio). Le mode audio reste disponible dans Paramètres.
 - Le modèle Gemini utilisé (`gemini-3.5-flash-lite` par défaut) se change dans l'onglet Paramètres ; en cas d'erreur 503, l'app réessaie et peut basculer sur un modèle de secours.
+- L'onglet **Modifier le texte** de l'atelier propose un éditeur visuel (gras, italique, souligné, couleur, titres,
+  citation, listes à trois niveaux) : inutile de connaître le Markdown pour rédiger ou corriger une fiche à la main.
 - L'interface s'adapte aux téléphones (jusqu'à 640 px de large : onglets épinglés, cartes compactes, liste
   de l'atelier au-dessus de l'espace de fichage) et aux tablettes (deux cartes par ligne). Les règles sont
   regroupées à la fin de `styles.css`.
