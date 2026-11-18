@@ -235,6 +235,10 @@ def current_model() -> str:
     return db.get_setting("gemini_model") or ai_engine.DEFAULT_MODEL
 
 
+def fiche_source_audio() -> bool:
+    return (db.get_setting("fiche_source") or "transcript").strip().lower() == "audio"
+
+
 @st.cache_data(show_spinner=False, max_entries=64)
 def _logo_data_uri(path: str, mtime: float, size: int) -> str | None:
     """Miniature d'un logo local, encodée pour être intégrée au HTML des cartes."""
@@ -697,24 +701,37 @@ def render_workspace(ep: dict[str, Any]) -> None:
 
     configured = ai_engine.is_configured()
     has_audio = bool(safe_url(ep["audio_url"]))
+    has_page = bool(safe_url(ep.get("link")))
+    use_audio = fiche_source_audio()
+    can_generate = configured and (has_audio if use_audio else has_page)
+    generate_label = (
+        "Générer la fiche IA (depuis l'audio intégral)"
+        if use_audio
+        else "Générer la fiche IA (depuis la retranscription)"
+    )
+    generate_help = (
+        "Télécharge l'audio, l'envoie à Gemini puis le supprime — mode lent, utile si la page n'a pas de retranscription."
+        if use_audio
+        else "Lit la retranscription publiée sur la page Radio France de l'épisode, puis rédige la fiche (beaucoup plus rapide)."
+    )
     generate = st.button(
-        "Générer la fiche IA (depuis l'audio intégral)",
+        generate_label,
         type="primary",
         icon=":material/auto_awesome:",
         key=f"generate_{ep['id']}",
-        disabled=not (configured and has_audio),
-        help="L'audio est téléchargé temporairement, analysé par Gemini, puis supprimé de votre machine "
-        "et des serveurs de Google. Une fiche déjà enregistrée n'est remplacée que si vous enregistrez le nouveau texte.",
+        disabled=not can_generate,
+        help=generate_help,
     )
     if not configured:
         st.caption("Clé Gemini absente : ajoutez `GEMINI_API_KEY` dans `.streamlit/secrets.toml` pour activer la génération.")
-    elif not has_audio:
-        st.caption("Cet épisode n'a pas de fichier audio dans le flux RSS : la fiche ne peut être rédigée qu'à la main.")
-    elif configured and has_audio:
+    elif use_audio and not has_audio:
+        st.caption("Mode audio activé dans Paramètres, mais cet épisode n'a pas de fichier audio dans le RSS.")
+    elif not use_audio and not has_page:
+        st.caption("Pas de lien vers la page de l'épisode dans le flux : forcez une synchronisation ou passez en mode audio dans Paramètres.")
+    elif not use_audio:
         st.caption(
-            "La génération depuis l'audio est plus lente que la synthèse mensuelle : téléchargement du fichier, "
-            "envoi multimodale et analyse intégrale par Gemini (souvent plusieurs minutes, même avec un modèle Flash). "
-            "La synthèse ne s'appuie que sur du texte déjà en base."
+            "Par défaut, la retranscription de la page d'épisode suffit. En cas d'erreur 503 durable sur Gemini, "
+            "l'app réessaie automatiquement et peut basculer sur un modèle de secours ; changez aussi le modèle dans Paramètres."
         )
 
     with st.expander("Importer une fiche rédigée à la main", icon=":material/upload_file:", expanded=False):
@@ -762,9 +779,12 @@ def render_workspace(ep: dict[str, Any]) -> None:
                 st.rerun()
 
     if generate:
-        with st.status("Génération de la fiche à partir de l'audio…", expanded=True) as status:
+        status_label = "Génération de la fiche à partir de l'audio…" if use_audio else "Génération de la fiche…"
+        with st.status(status_label, expanded=True) as status:
             try:
-                generated = ai_engine.generate_fiche(ep, model=current_model(), on_step=status.write)
+                generated = ai_engine.generate_fiche(
+                    ep, model=current_model(), on_step=status.write, use_audio=use_audio
+                )
             except ai_engine.AIEngineError as exc:
                 status.update(label="La fiche n'a pas pu être générée", state="error")
                 st.error(str(exc))
@@ -791,8 +811,8 @@ def render_workspace(ep: dict[str, Any]) -> None:
         else:
             sections = "".join(f'<div class="plan-item">{esc(section)}</div>' for section in ai_engine.FICHE_SECTIONS)
             render_html(f'<div class="fiche-plan"><div class="fiche-plan-title">{icon("layers")}Plan de la fiche INSP</div>'
-                    f'{sections}<div class="fiche-plan-note">Générez la fiche depuis l\'audio, importez un fichier '
-                    f'Markdown/PDF, ou rédigez dans l\'onglet « Modifier le texte ».</div></div>')
+                    f'{sections}<div class="fiche-plan-note">Générez la fiche depuis la retranscription, importez un '
+                    f'fichier Markdown/PDF, ou rédigez dans l\'onglet « Modifier le texte ».</div></div>')
 
     dirty = text.strip() != saved
     save_col, discard_col, delete_col = st.columns([1.5, 1.5, 1.2])
@@ -1198,10 +1218,27 @@ def render_parametres() -> None:
         if model not in choices:
             choices.insert(0, model)
         chosen = st.selectbox("Modèle Gemini", choices, index=choices.index(model), accept_new_options=True,
-                              help="Vous pouvez saisir un autre identifiant de modèle Gemini acceptant l'audio.", width=420)
+                              help="Par défaut gemini-3.5-flash-lite. En cas d'erreur 503 prolongée, essayez un autre identifiant.",
+                              width=420)
         if chosen and chosen != model:
             db.set_setting("gemini_model", chosen.strip())
             flash(f"Modèle Gemini : {chosen.strip()}.")
+            st.rerun()
+        source = (db.get_setting("fiche_source") or "transcript").strip().lower()
+        source_choice = st.radio(
+            "Source pour générer les fiches",
+            options=("transcript", "audio"),
+            index=1 if source == "audio" else 0,
+            format_func=lambda value: (
+                "Retranscription Radio France (recommandé, rapide)"
+                if value == "transcript"
+                else "Audio intégral (lent, multimodal)"
+            ),
+            help="La retranscription est celle affichée sur la page de l'épisode ; l'audio n'est plus nécessaire par défaut.",
+        )
+        if source_choice != source:
+            db.set_setting("fiche_source", source_choice)
+            flash("Source des fiches mise à jour.")
             st.rerun()
 
 

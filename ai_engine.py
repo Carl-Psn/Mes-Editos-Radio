@@ -15,10 +15,21 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
+import transcript_fetcher
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gemini-4-hydrogen"
-MODEL_CHOICES = ("gemini-4-hydrogen", "gemini-4-argon", "gemini-4-carbon", "gemini-3.8-flash")
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
+FALLBACK_MODEL = "gemini-3.5-flash-lite"
+MODEL_CHOICES = (
+    "gemini-3.5-flash-lite",
+    "gemini-4-hydrogen",
+    "gemini-4-argon",
+    "gemini-4-carbon",
+    "gemini-3.8-flash",
+)
+RETRYABLE_API_CODES = frozenset({429, 500, 502, 503, 504})
+MAX_API_ATTEMPTS = 5
 
 DOWNLOAD_TIMEOUT = (10, 120)
 FILE_READY_TIMEOUT = 300
@@ -61,17 +72,7 @@ _SYSTEM_INSTRUCTION = (
     "européennes et internationales et pour l'oral. Tu n'inventes jamais un chiffre, une date ou une citation."
 )
 
-_FICHE_PROMPT = """Écoute l'intégralité de cet enregistrement audio, une chronique de France Inter, puis rédige \
-une fiche de révision complète pour un candidat au concours de l'INSP.
-
-Contexte de l'épisode :
-- Émission : {show}
-- Date de diffusion : {date}
-- Titre : {title}
-- Intervenant(s) : {author}
-- Résumé du flux RSS : {summary}
-
-Structure obligatoire : exactement ces quatre parties, dans cet ordre, avec ces intitulés comme titres \
+_FICHE_SECTIONS_PROMPT = """Structure obligatoire : exactement ces quatre parties, dans cet ordre, avec ces intitulés comme titres \
 Markdown de niveau 2 :
 
 ## {s1}
@@ -79,7 +80,7 @@ La thèse défendue par le chroniqueur, formulée en deux ou trois phrases, puis
 soulève, rédigée sous forme de question.
 
 ## {s2}
-Liste à puces de tous les faits, chiffres, dates, textes et citations mentionnés dans l'audio, restitués \
+Liste à puces de tous les faits, chiffres, dates, textes et citations mentionnés dans la chronique, restitués \
 avec exactitude et avec leur unité ou leur source quand elle est donnée.
 
 ## {s3}
@@ -92,15 +93,65 @@ budgétaires, arbitrages), puis une ouverture concours : notions et références
 sujets de composition ou questions d'oral auxquels cet édito peut servir d'accroche ou d'exemple.
 
 Règles :
-- Appuie-toi d'abord sur ce qui est réellement dit dans l'audio. Si un chiffre ou un nom est inaudible \
-ou incertain, signale-le par « (à vérifier) » au lieu de le deviner.
-- Les compléments qui viennent de tes connaissances et non de l'audio sont réservés à la partie 4 et \
+- Appuie-toi d'abord sur la source fournie (retranscription ou audio). Si un élément est absent ou \
+incertain, signale-le par « (à vérifier) » au lieu de le deviner.
+- Les compléments qui viennent de tes connaissances et non de la chronique sont réservés à la partie 4 et \
 introduits par « Pour aller plus loin : ».
 - Distingue les faits de l'opinion du chroniqueur.
 - Mise en forme Markdown sobre : titres de niveau 2 pour les quatre parties, listes à puces avec « - », \
 gras pour les notions clés. Pas de tableau, pas de bloc de code, pas d'émoji.
 - Commence directement par le premier titre, sans introduction ni conclusion hors plan.
 """
+
+_FICHE_PROMPT_TRANSCRIPT = """À partir de la retranscription officielle publiée sur radiofrance.fr ci-dessous, rédige \
+une fiche de révision complète pour un candidat au concours de l'INSP.
+
+Contexte de l'épisode :
+- Émission : {show}
+- Date de diffusion : {date}
+- Titre : {title}
+- Intervenant(s) : {author}
+- Résumé du flux RSS : {summary}
+
+Retranscription intégrale :
+
+{transcript}
+
+{sections}
+"""
+
+_FICHE_PROMPT_AUDIO = """Écoute l'intégralité de cet enregistrement audio, une chronique de France Inter, puis rédige \
+une fiche de révision complète pour un candidat au concours de l'INSP.
+
+Contexte de l'épisode :
+- Émission : {show}
+- Date de diffusion : {date}
+- Titre : {title}
+- Intervenant(s) : {author}
+- Résumé du flux RSS : {summary}
+
+{sections}
+"""
+
+
+def _fiche_sections_block() -> str:
+    return _FICHE_SECTIONS_PROMPT.format(
+        s1=FICHE_SECTIONS[0],
+        s2=FICHE_SECTIONS[1],
+        s3=FICHE_SECTIONS[2],
+        s4=FICHE_SECTIONS[3],
+    )
+
+
+def _episode_context(episode: dict[str, Any]) -> dict[str, str]:
+    return {
+        "show": episode.get("show_title") or "Chronique France Inter",
+        "date": episode.get("pub_date") or "non précisée",
+        "title": episode.get("title") or "sans titre",
+        "author": episode.get("author") or "non précisé",
+        "summary": episode.get("summary") or "non fourni",
+        "sections": _fiche_sections_block(),
+    }
 
 _SYNTHESIS_PROMPT = """Voici l'ensemble des chroniques de France Inter suivies en {month_label} par un candidat \
 au concours de l'INSP ({count} épisodes). Pour chaque épisode figurent l'émission, la date, le titre, le \
@@ -267,19 +318,104 @@ def _response_text(response: types.GenerateContentResponse) -> str:
 def _api_error_message(exc: genai_errors.APIError) -> str:
     code = getattr(exc, "code", None)
     message = getattr(exc, "message", None) or str(exc)
-    return f"Erreur de l'API Gemini{f' ({code})' if code else ''} : {message}"
+    hint = ""
+    if code in (429, 503):
+        hint = (
+            " Google signale une forte demande : l'application réessaie automatiquement et peut basculer "
+            f"sur `{FALLBACK_MODEL}`. Si l'erreur se répète depuis longtemps, changez de modèle dans "
+            "Paramètres ou réessayez plus tard."
+        )
+    return f"Erreur de l'API Gemini{f' ({code})' if code else ''} : {message}.{hint}"
+
+
+def _generate_content_with_retries(
+    client: genai.Client,
+    *,
+    model: str,
+    contents: Any,
+    config: types.GenerateContentConfig,
+    on_step: Callable[[str], None] | None = None,
+) -> types.GenerateContentResponse:
+    """Appelle Gemini avec reprises exponentielles et repli sur un modèle plus disponible."""
+    notify = on_step or (lambda _message: None)
+    models_to_try = [model]
+    if model != FALLBACK_MODEL:
+        models_to_try.append(FALLBACK_MODEL)
+
+    last_exc: genai_errors.APIError | None = None
+    for model_index, active_model in enumerate(models_to_try):
+        if model_index:
+            notify(f"Bascule sur le modèle de secours {active_model}…")
+        delay = 2
+        for attempt in range(1, MAX_API_ATTEMPTS + 1):
+            try:
+                return client.models.generate_content(model=active_model, contents=contents, config=config)
+            except genai_errors.APIError as exc:
+                last_exc = exc
+                code = getattr(exc, "code", None)
+                if code not in RETRYABLE_API_CODES:
+                    raise AIEngineError(_api_error_message(exc)) from exc
+                if attempt >= MAX_API_ATTEMPTS:
+                    break
+                notify(
+                    f"Gemini indisponible (code {code}) — nouvel essai {attempt}/{MAX_API_ATTEMPTS} "
+                    f"dans {delay} s…"
+                )
+                time.sleep(delay)
+                delay = min(delay * 2, 45)
+    assert last_exc is not None
+    raise AIEngineError(_api_error_message(last_exc))
 
 
 def generate_fiche(
     episode: dict[str, Any],
     model: str | None = None,
     on_step: Callable[[str], None] | None = None,
+    *,
+    use_audio: bool = False,
 ) -> str:
-    """Génère la fiche INSP d'un épisode à partir de son audio intégral.
+    """Génère la fiche INSP à partir de la retranscription Radio France (défaut) ou de l'audio."""
+    if use_audio:
+        return _generate_fiche_from_audio(episode, model=model, on_step=on_step)
+    return _generate_fiche_from_transcript(episode, model=model, on_step=on_step)
 
-    L'audio est téléchargé dans un fichier temporaire, envoyé à Gemini via l'API Files, analysé,
-    puis le fichier local et le fichier distant sont supprimés, y compris en cas d'échec.
-    """
+
+def _generate_fiche_from_transcript(
+    episode: dict[str, Any],
+    model: str | None = None,
+    on_step: Callable[[str], None] | None = None,
+) -> str:
+    notify = on_step or (lambda _message: None)
+    link = episode.get("link")
+    if not link:
+        raise AIEngineError("Cet épisode n'a pas de lien vers sa page Radio France dans le flux RSS.")
+    client = get_client()
+    notify("Lecture de la retranscription sur radiofrance.fr…")
+    try:
+        transcript = transcript_fetcher.fetch_transcript(link)
+    except transcript_fetcher.TranscriptError as exc:
+        raise AIEngineError(str(exc)) from exc
+    notify(f"Retranscription récupérée ({len(transcript):,} caractères). Rédaction de la fiche…".replace(",", " "))
+    ctx = _episode_context(episode)
+    prompt = _FICHE_PROMPT_TRANSCRIPT.format(transcript=transcript, **ctx)
+    config = types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION)
+    try:
+        response = _generate_content_with_retries(
+            client, model=model or DEFAULT_MODEL, contents=prompt, config=config, on_step=notify
+        )
+    except AIEngineError:
+        raise
+    except Exception as exc:
+        raise AIEngineError(f"Échec de l'appel à Gemini ({type(exc).__name__}) : {exc}") from exc
+    return _response_text(response)
+
+
+def _generate_fiche_from_audio(
+    episode: dict[str, Any],
+    model: str | None = None,
+    on_step: Callable[[str], None] | None = None,
+) -> str:
+    """Mode alternatif : audio intégral (plus lent, utile si la retranscription manque)."""
     notify = on_step or (lambda _message: None)
     audio_url = episode.get("audio_url")
     if not audio_url:
@@ -296,22 +432,15 @@ def generate_fiche(
         uploaded = client.files.upload(file=local_path, config=types.UploadFileConfig(mime_type=mime_type))
         uploaded = _wait_until_active(client, uploaded, on_step=notify)
 
-        notify("Rédaction de la fiche à partir de l'audio (peut prendre quelques minutes)…")
-        prompt = _FICHE_PROMPT.format(
-            show=episode.get("show_title") or "Chronique France Inter",
-            date=episode.get("pub_date") or "non précisée",
-            title=episode.get("title") or "sans titre",
-            author=episode.get("author") or "non précisé",
-            summary=episode.get("summary") or "non fourni",
-            s1=FICHE_SECTIONS[0],
-            s2=FICHE_SECTIONS[1],
-            s3=FICHE_SECTIONS[2],
-            s4=FICHE_SECTIONS[3],
-        )
-        response = client.models.generate_content(
+        notify("Rédaction de la fiche à partir de l'audio (plusieurs minutes)…")
+        prompt = _FICHE_PROMPT_AUDIO.format(**_episode_context(episode))
+        config = types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION)
+        response = _generate_content_with_retries(
+            client,
             model=model or DEFAULT_MODEL,
             contents=[uploaded, prompt],
-            config=types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION),
+            config=config,
+            on_step=notify,
         )
         return _response_text(response)
     except AIEngineError:
@@ -356,14 +485,13 @@ def generate_monthly_synthesis(month_label: str, episodes: list[dict[str, Any]],
     prompt = _SYNTHESIS_PROMPT.format(
         month_label=month_label, count=len(episodes), corpus=build_month_corpus(episodes)
     )
+    config = types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION)
     try:
-        response = client.models.generate_content(
-            model=model or DEFAULT_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION),
+        response = _generate_content_with_retries(
+            client, model=model or DEFAULT_MODEL, contents=prompt, config=config
         )
-    except genai_errors.APIError as exc:
-        raise AIEngineError(_api_error_message(exc)) from exc
+    except AIEngineError:
+        raise
     except Exception as exc:
         raise AIEngineError(f"Échec de l'appel à Gemini ({type(exc).__name__}) : {exc}") from exc
     return _response_text(response)

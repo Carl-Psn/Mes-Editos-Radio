@@ -25,7 +25,8 @@ Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche ex
 | `app.py` | Interface, onglets et état de session |
 | `database.py` | Base SQLite locale (`editos_insp.db`, créée au premier lancement) |
 | `rss_fetcher.py` | Lecture des flux RSS, exclusion des dimanches, synchronisation |
-| `ai_engine.py` | Fiches depuis l'audio intégral et synthèse mensuelle (SDK `google-genai`) |
+| `ai_engine.py` | Fiches depuis la retranscription Radio France (défaut) ou l'audio, synthèse mensuelle (`google-genai`) |
+| `transcript_fetcher.py` | Extraction de la retranscription sur la page web de l'épisode |
 | `exporter.py` | Exports Word (`python-docx`) et PDF (`fpdf2`) |
 | `fiche_import.py` | Import de fiches manuelles (Markdown, PDF via `pypdf`) |
 | `styles.css`, `.streamlit/config.toml` | Charte graphique |
@@ -38,7 +39,8 @@ Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche ex
   heure, ou forcée depuis l'onglet Paramètres).
 - Les nouveaux épisodes arrivent en priorité « 1 - Secondaire ». Les exports « prioritaires »
   retiennent par défaut les priorités 2 et 3 ; ce seuil se règle dans le module d'export.
-- Le modèle Gemini utilisé (`gemini-4-hydrogen` par défaut) se change dans l'onglet Paramètres.
+- Les fiches IA s'appuient par défaut sur la **retranscription** de la page `radiofrance.fr` de l'épisode (plus rapide que l'audio). Le mode audio reste disponible dans Paramètres.
+- Le modèle Gemini utilisé (`gemini-3.5-flash-lite` par défaut) se change dans l'onglet Paramètres ; en cas d'erreur 503, l'app réessaie et peut basculer sur un modèle de secours.
 - Le PDF utilise une police Unicode du système (Liberation Sans, DejaVu Sans, Noto Sans ou Arial).
   Si aucune n'est installée, il se rabat sur Helvetica en translittérant les caractères hors Latin-1
   (par exemple « œ » devient « oe »).
