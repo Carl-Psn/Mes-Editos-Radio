@@ -1,0 +1,845 @@
+/* Charte : rouge France Inter, fond blanc cassé, cartes blanches arrondies façon NotebookLM. */
+
+:root {
+  --inter-red: #E2001A;
+  --inter-red-soft: #FDECEE;
+  --page: #F8F9FA;
+  --card: #FFFFFF;
+  --line: #E5E7EB;
+  --ink: #111827;
+  --ink-soft: #374151;
+  --muted: #6B7280;
+  --politique: #E2001A;
+  --politique-bg: #FDECEE;
+  --eco: #0F766E;
+  --eco-bg: #E3F3F0;
+  --geopolitique: #1E3A8A;
+  --geopolitique-bg: #E8EDF8;
+  --invite: #7B2D5B;
+  --invite-bg: #F6E9F1;
+  --autre: #4B5563;
+  --autre-bg: #F1F2F4;
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.04);
+}
+
+.stApp {
+  background: var(--page);
+}
+
+.stMainBlockContainer {
+  max-width: 1320px;
+  padding-top: 2.2rem;
+  padding-bottom: 4rem;
+}
+
+[data-testid="stHeader"] {
+  background: transparent;
+}
+
+/* Streamlit retire 1rem sous chaque bloc Markdown pour compenser la marge du dernier paragraphe ;
+   nos blocs HTML n'en ont pas. */
+[data-testid="stMarkdownContainer"]:has(> .ui) {
+  margin-bottom: 0;
+}
+
+.ui {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.ico {
+  flex: none;
+  vertical-align: -0.18em;
+}
+
+/* ------------------------------------------------------------------ en-tête */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  padding: 4px 2px 6px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-mark {
+  flex: none;
+  filter: drop-shadow(0 6px 14px rgba(226, 0, 26, 0.22));
+}
+
+.brand-kicker {
+  color: var(--inter-red);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.brand-title {
+  margin: 2px 0 2px;
+  padding: 0;
+  color: var(--ink);
+  font-size: 1.95rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.brand-sub {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.masthead-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.83rem;
+}
+
+.stat-pill .ico {
+  color: var(--inter-red);
+}
+
+/* ------------------------------------------------------------------- onglets */
+
+.stTabs [data-baseweb="tab-list"] {
+  gap: 4px;
+}
+
+.stTabs [data-baseweb="tab"] {
+  height: auto;
+  padding: 10px 16px;
+  border-radius: 12px 12px 0 0;
+  font-weight: 600;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+  background: rgba(226, 0, 26, 0.05);
+}
+
+.stTabs [data-baseweb="tab-panel"] {
+  padding-top: 1.4rem;
+}
+
+/* -------------------------------------------------------------------- cartes */
+
+[class*="st-key-card_"],
+[class*="st-key-workspace_"],
+[class*="st-key-settings_"],
+[class*="st-key-fiche_preview_"],
+.st-key-synthesis_card,
+.st-key-export_card,
+.st-key-add_show_card,
+.st-key-sync_card,
+.st-key-ai_card {
+  padding: 18px 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+[class*="st-key-card_"] {
+  gap: 0.55rem;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+[class*="st-key-card_"]:hover {
+  box-shadow: 0 2px 4px rgba(17, 24, 39, 0.05), 0 12px 28px rgba(17, 24, 39, 0.08);
+  transform: translateY(-1px);
+}
+
+[class*="st-key-card_politique_"],
+[class*="st-key-workspace_politique_"],
+[class*="st-key-settings_politique_"] {
+  border-top: 3px solid var(--politique);
+}
+
+[class*="st-key-card_eco_"],
+[class*="st-key-workspace_eco_"],
+[class*="st-key-settings_eco_"] {
+  border-top: 3px solid var(--eco);
+}
+
+[class*="st-key-card_geopolitique_"],
+[class*="st-key-workspace_geopolitique_"],
+[class*="st-key-settings_geopolitique_"] {
+  border-top: 3px solid var(--geopolitique);
+}
+
+[class*="st-key-card_invite_"],
+[class*="st-key-workspace_invite_"],
+[class*="st-key-settings_invite_"] {
+  border-top: 3px solid var(--invite);
+}
+
+[class*="st-key-card_autre_"],
+[class*="st-key-workspace_autre_"],
+[class*="st-key-settings_autre_"] {
+  border-top: 3px solid var(--autre);
+}
+
+[class*="st-key-card_"][class*="_done_"] {
+  background: #FCFCFD;
+  box-shadow: none;
+}
+
+[class*="st-key-card_"][class*="_done_"] .ep-title {
+  color: var(--muted);
+}
+
+[class*="st-key-card_"][class*="_done_"] .ep-thumb {
+  filter: grayscale(0.85);
+  opacity: 0.75;
+}
+
+[class*="st-key-settings_"] {
+  margin-bottom: 1rem;
+}
+
+/* ------------------------------------------------------------------ épisodes */
+
+.ep-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ep-headtext {
+  flex: 1;
+  min-width: 0;
+}
+
+.badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ep-thumb {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  object-fit: cover;
+  background: var(--autre-bg);
+}
+
+.ep-thumb.large {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+}
+
+.thumb-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-politique { color: var(--politique); background: var(--politique-bg); }
+.thumb-eco { color: var(--eco); background: var(--eco-bg); }
+.thumb-geopolitique { color: var(--geopolitique); background: var(--geopolitique-bg); }
+.thumb-invite { color: var(--invite); background: var(--invite-bg); }
+.thumb-autre { color: var(--autre); background: var(--autre-bg); }
+
+.ep-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+.badge-politique { color: var(--politique); background: var(--politique-bg); }
+.badge-eco { color: var(--eco); background: var(--eco-bg); }
+.badge-geopolitique { color: var(--geopolitique); background: var(--geopolitique-bg); }
+.badge-invite { color: var(--invite); background: var(--invite-bg); }
+.badge-autre { color: var(--autre); background: var(--autre-bg); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.ep-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.ep-title {
+  margin-top: 12px;
+  color: var(--ink);
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.005em;
+}
+
+.ws-title {
+  margin: 6px 0 2px;
+  color: var(--ink);
+  font-size: 1.22rem;
+  font-weight: 750;
+  line-height: 1.28;
+  letter-spacing: -0.012em;
+}
+
+.ep-summary {
+  display: -webkit-box;
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.87rem;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.ep-summary.full {
+  display: block;
+  margin-top: 12px;
+}
+
+.ep-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.ep-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--inter-red) !important;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none !important;
+}
+
+.ep-link:hover {
+  text-decoration: underline !important;
+}
+
+/* ------------------------------------------------------------- suivi mensuel */
+
+.month-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.month-strip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.month-strip-text b {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.month-strip-text span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.progress {
+  flex: 1;
+  min-width: 80px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #EEF0F3;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--inter-red);
+}
+
+.bar-eco { background: var(--eco); }
+.bar-geopolitique { background: var(--geopolitique); }
+.bar-invite { background: var(--invite); }
+.bar-autre { background: var(--autre); }
+
+.progress-value {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.day-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 1.5rem;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.day-name {
+  color: var(--ink);
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+.day-date {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.day-count {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #EEF0F3;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.day-empty,
+.slot-empty {
+  border: 1px dashed #D5D9E0;
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.day-empty {
+  padding: 12px 18px;
+}
+
+.slot-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 18px;
+}
+
+.slot-empty b {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+/* ------------------------------------------------------------ titres, états */
+
+.section-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 1.4rem 0 0.2rem;
+}
+
+.section-name {
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+.section-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--inter-red-soft);
+  color: var(--inter-red);
+}
+
+.section-hint {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.list-caption,
+.card-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.card-kicker .ico {
+  color: var(--inter-red);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 44px 24px 40px;
+  border: 1px dashed #D5D9E0;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.6);
+  text-align: center;
+}
+
+.empty-title {
+  margin-top: 10px;
+  color: var(--ink);
+  font-size: 1.08rem;
+  font-weight: 750;
+}
+
+.empty-text {
+  max-width: 520px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.callout .ico {
+  margin-top: 2px;
+}
+
+.callout-draft {
+  border-color: #F6C9CE;
+  background: var(--inter-red-soft);
+}
+
+.callout-draft .ico {
+  color: var(--inter-red);
+}
+
+.callout-saved {
+  border-color: #BFE3DC;
+  background: var(--eco-bg);
+}
+
+.callout-saved .ico {
+  color: var(--eco);
+}
+
+.callout code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.06);
+  font-size: 0.82rem;
+}
+
+/* ------------------------------------------------- liste de l'atelier de fichage */
+
+.st-key-atelier_list {
+  gap: 0.5rem;
+  padding-right: 6px;
+}
+
+.st-key-atelier_list button {
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 11px 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  text-align: left;
+}
+
+.st-key-atelier_list button > div,
+.st-key-atelier_list button > div > span {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.st-key-atelier_list button [data-testid="stMarkdownContainer"] {
+  width: 100%;
+  text-align: left;
+}
+
+.st-key-atelier_list button p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.st-key-atelier_list button:hover,
+.st-key-atelier_list button:focus-visible {
+  border-color: #CBD0D8;
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+
+.st-key-atelier_list [class*="st-key-picksel_"] button {
+  border-color: var(--inter-red);
+  background: #FFF6F7;
+  box-shadow: inset 4px 0 0 var(--inter-red);
+}
+
+/* -------------------------------------------------------------------- fiches */
+
+.fiche-plan {
+  padding: 20px 22px;
+  border: 1px dashed #D5D9E0;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.fiche-plan-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.fiche-plan-title .ico {
+  color: var(--inter-red);
+}
+
+.plan-item {
+  padding: 4px 0 4px 30px;
+}
+
+.plan-item:first-of-type {
+  margin-top: 8px;
+}
+
+.fiche-plan-note {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+[class*="st-key-fiche_preview_"] h2,
+.st-key-synthesis_card h2 {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0 0.3rem;
+  color: var(--inter-red);
+  font-size: 1.1rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+[class*="st-key-fiche_preview_"] h3,
+.st-key-synthesis_card h3 {
+  padding: 0.4rem 0 0.2rem;
+  font-size: 1rem;
+}
+
+[class*="st-key-fiche_preview_"] p,
+[class*="st-key-fiche_preview_"] li,
+.st-key-synthesis_card p,
+.st-key-synthesis_card li {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------- bilan */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.kpi {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.kpi-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: #F1F2F4;
+  color: var(--ink-soft);
+}
+
+.kpi-accent .kpi-ico {
+  background: var(--inter-red-soft);
+  color: var(--inter-red);
+}
+
+.kpi-value {
+  color: var(--ink);
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.kpi-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.show-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.show-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) 1fr minmax(150px, auto);
+  align-items: center;
+  gap: 16px;
+}
+
+.show-row .badge {
+  justify-self: start;
+}
+
+.show-row-text {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- paramètres */
+
+.status {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.status-error {
+  color: var(--inter-red);
+}
+
+.sync-report {
+  margin-top: 4px;
+}
+
+.sync-report .card-kicker {
+  margin-bottom: 8px;
+}
+
+.sync-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+
+.sync-line span:last-child {
+  color: var(--muted);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-1px);
+}
+
+.dot-ok { background: var(--eco); }
+.dot-error { background: var(--inter-red); }
+
+@media (max-width: 760px) {
+  .brand-title {
+    font-size: 1.5rem;
+  }
+
+  .show-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .show-row-text {
+    text-align: left;
+  }
+}
