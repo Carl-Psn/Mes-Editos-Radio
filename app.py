@@ -12,6 +12,7 @@ import dataclasses
 import html
 import io
 import json
+import re
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -51,6 +52,10 @@ CATEGORY_ICONS = {
     "invite": "mic",
     "autre": "rss",
 }
+
+# Couleurs de badge Streamlit (redéfinies dans .streamlit/config.toml) associées à chaque famille d'émission.
+BADGE_COLORS = {"politique": "red", "eco": "green", "geopolitique": "blue", "invite": "violet", "autre": "gray"}
+LIST_LIMIT = 150
 
 EXPORT_SINGLE = "single"
 EXPORT_CATEGORY = "category"
@@ -147,6 +152,15 @@ def esc(value: Any) -> str:
     return html.escape(str(value or ""), quote=True)
 
 
+def md_escape(text: str) -> str:
+    """Neutralise la syntaxe Markdown d'un texte issu du RSS avant de l'insérer dans un libellé de widget."""
+    return re.sub(r"([\\*_\[\]`$~<>#|])", r"\\\1", text)
+
+
+def plural(count: int, singular: str, plural_form: str | None = None) -> str:
+    return f"{count} {singular if count <= 1 else plural_form or singular + 's'}"
+
+
 def safe_url(url: str | None) -> str | None:
     return url if url and url.startswith(("http://", "https://")) else None
 
@@ -186,7 +200,8 @@ def category_of(item: dict[str, Any]) -> str:
 
 
 def badge(label: str, category: str) -> str:
-    return f'<span class="badge badge-{category}">{icon(CATEGORY_ICONS[category], 13)}{esc(label)}</span>'
+    return (f'<span class="badge badge-{category}">{icon(CATEGORY_ICONS[category], 13)}'
+            f'<span class="badge-text">{esc(label)}</span></span>')
 
 
 def time_label(published_at: str | None) -> str:
@@ -374,9 +389,9 @@ def render_masthead() -> None:
             </div>
           </div>
           <div class="masthead-stats">
-            <div class="stat-pill">{icon("calendar")}<span><b>{len(episodes)}</b> épisodes en {esc(label)}</span></div>
-            <div class="stat-pill">{icon("headphones")}<span><b>{listened}</b> écoutés</span></div>
-            <div class="stat-pill">{icon("file")}<span><b>{fiches}</b> fiches</span></div>
+            <div class="stat-pill">{icon("calendar")}<span><b>{len(episodes)}</b> épisode{"s" if len(episodes) > 1 else ""} en {esc(label)}</span></div>
+            <div class="stat-pill">{icon("headphones")}<span><b>{listened}</b> écouté{"s" if listened > 1 else ""}</span></div>
+            <div class="stat-pill">{icon("file")}<span><b>{fiches}</b> fiche{"s" if fiches > 1 else ""}</span></div>
           </div>
         </header>
         """
@@ -394,11 +409,14 @@ def _on_priority(episode_id: int, key: str) -> None:
     db.set_priority(episode_id, int(st.session_state[key]))
 
 
-def tracking_controls(ep: dict[str, Any], scope: str) -> None:
+def tracking_controls(ep: dict[str, Any], scope: str, stacked: bool = False) -> None:
     """Case « Écouté » et sélecteur de priorité, enregistrés dès qu'ils changent."""
     listened_key = f"{scope}_listened_{ep['id']}"
     priority_key = f"{scope}_priority_{ep['id']}"
-    check_col, priority_col = st.columns([1, 1.7], vertical_alignment="center")
+    if stacked:
+        check_col = priority_col = st
+    else:
+        check_col, priority_col = st.columns([1, 1.7], vertical_alignment="center")
     check_col.checkbox(
         "Écouté",
         value=bool(ep["listened"]),
@@ -429,7 +447,7 @@ def episode_links_html(ep: dict[str, Any]) -> str:
     return f'<div class="ep-links">{"".join(links)}</div>' if links else ""
 
 
-def episode_card(ep: dict[str, Any]) -> None:
+def episode_card(ep: dict[str, Any], narrow: bool = False) -> None:
     category = category_of(ep)
     state = "done" if ep["listened"] else "todo"
     meta = " · ".join(part for part in (time_label(ep["published_at"]), duration_label(ep["duration"])) if part)
@@ -450,7 +468,7 @@ def episode_card(ep: dict[str, Any]) -> None:
             {episode_links_html(ep)}
             """
         )
-        tracking_controls(ep, "suivi")
+        tracking_controls(ep, "suivi", stacked=narrow)
 
 
 def render_suivi() -> None:
@@ -481,7 +499,7 @@ def render_suivi() -> None:
         f"""
         <div class="month-strip">
           <div class="month-strip-text"><b>{esc(label.capitalize())}</b>
-            <span>{len(episodes)} épisodes · {listened} écoutés · {top} incontournables</span></div>
+            <span>{plural(len(episodes), "épisode")} · {plural(listened, "écouté")} · {plural(top, "incontournable")}</span></div>
           <div class="progress"><div class="progress-bar" style="width:{percent}%"></div></div>
           <div class="progress-value">{percent} %</div>
         </div>
@@ -505,7 +523,7 @@ def render_suivi() -> None:
         if hide_listened and not visible:
             continue
         shown += 1
-        counter = f'<span class="day-count">{done}/{len(day_episodes)} écoutés</span>' if day_episodes else ""
+        counter = f'<span class="day-count">{done}/{len(day_episodes)} écouté{"s" if done > 1 else ""}</span>' if day_episodes else ""
         weekday, rest = exporter.format_date_fr(day).split(" ", 1)
         render_html(
             f'<div class="day-header"><span class="day-name">{esc(weekday.capitalize())}</span>'
@@ -525,7 +543,7 @@ def render_suivi() -> None:
                         text = "Déjà écouté" if has_hidden else "Pas d'épisode ce jour-là"
                         render_html(f'<div class="slot-empty"><b>{esc(show_name(show))}</b><span>{text}</span></div>')
                     for ep in show_episodes:
-                        episode_card(ep)
+                        episode_card(ep, narrow=len(columns) > 3)
     if shown == 0:
         empty_state("Tout est écouté", "Aucun épisode en attente d'écoute sur ce mois.")
 
@@ -533,10 +551,27 @@ def render_suivi() -> None:
 # ------------------------------------------------------ onglet 2 : atelier de fichage
 
 
-def _fiche_status(ep: dict[str, Any]) -> str:
+def _select_episode(episode_id: int) -> None:
+    st.session_state["atelier_episode_id"] = episode_id
+
+
+def episode_button_label(ep: dict[str, Any]) -> str:
+    """Libellé Markdown d'une ligne de la liste : badge de l'émission, date, priorité, état de la fiche, titre."""
+    color = BADGE_COLORS[category_of(ep)]
+    day = date.fromisoformat(ep["pub_date"])
+    stars = "★" * ep["priority"] + "☆" * (3 - ep["priority"])
     if (ep["fiche_draft"] or "").strip():
-        return "Brouillon"
-    return "Oui" if (ep["fiche"] or "").strip() else "—"
+        status = " :orange-badge[:material/edit_note: Brouillon]"
+    elif (ep["fiche"] or "").strip():
+        status = " :gray-badge[:material/description: Fiche]"
+    else:
+        status = ""
+    listened = " :gray[:material/headphones:]" if ep["listened"] else ""
+    return (
+        f":{color}-badge[{md_escape(ep['show_title'] or 'Émission')}] "
+        f":gray[{day.strftime('%d/%m/%y')}] :red[{stars}]{listened}{status}  \n"
+        f"**{md_escape(ep['title'])}**"
+    )
 
 
 def render_atelier() -> None:
@@ -583,53 +618,33 @@ def render_atelier() -> None:
         newest_first=True,
     )
 
+    ids = [ep["id"] for ep in episodes]
+    remembered = st.session_state.get("atelier_episode_id")
+    selected_id = remembered if remembered in ids else None
+
     list_col, work_col = st.columns([5, 7], gap="large")
     with list_col:
-        render_html(f'<div class="list-caption">{len(episodes)} épisode{"s" if len(episodes) > 1 else ""} '
-                f"correspondent aux filtres</div>")
+        render_html(f'<div class="list-caption">{plural(len(episodes), "épisode")} correspondant aux filtres</div>')
         if not episodes:
             empty_state("Aucun épisode", "Élargissez les filtres pour retrouver des épisodes à ficher.")
-            selected_id = None
         else:
-            ids = [ep["id"] for ep in episodes]
-            remembered = st.session_state.get("atelier_episode_id")
-            default = {"selection": {"rows": [ids.index(remembered)]}} if remembered in ids else None
-            event = st.dataframe(
-                [
-                    {
-                        "Date": date.fromisoformat(ep["pub_date"]).strftime("%d/%m/%y"),
-                        "Émission": ep["show_title"],
-                        "Sujet": ep["title"],
-                        "Priorité": ep["priority"],
-                        "Fiche": _fiche_status(ep),
-                    }
-                    for ep in episodes
-                ],
-                key=f"atelier_table_{hash(tuple(ids))}",
-                on_select="rerun",
-                selection_mode="single-row",
-                selection_default=default,
-                hide_index=True,
-                height=560,
-                column_config={
-                    "Date": st.column_config.TextColumn(width=70),
-                    "Émission": st.column_config.TextColumn(width=120),
-                    "Sujet": st.column_config.TextColumn(width=300),
-                    "Priorité": st.column_config.NumberColumn(width=60, help="1 Secondaire · 2 Important · 3 Incontournable INSP"),
-                    "Fiche": st.column_config.TextColumn(width=75),
-                },
-            )
-            rows = event.selection.rows
-            if rows and rows[0] < len(ids):
-                selected_id = ids[rows[0]]
-                st.session_state["atelier_episode_id"] = selected_id
-            else:
-                selected_id = remembered if remembered in ids else None
+            with st.container(height=660, border=False, key="atelier_list"):
+                for ep in episodes[:LIST_LIMIT]:
+                    prefix = "picksel" if ep["id"] == selected_id else "pick"
+                    st.button(
+                        episode_button_label(ep),
+                        key=f"{prefix}_{ep['id']}",
+                        on_click=_select_episode,
+                        args=(ep["id"],),
+                        width="stretch",
+                    )
+            if len(episodes) > LIST_LIMIT:
+                st.caption(f"Seuls les {LIST_LIMIT} épisodes les plus récents sont listés : affinez les filtres pour voir les autres.")
 
     with work_col:
         episode = db.get_episode(selected_id) if selected_id else None
         if not episode:
-            empty_state("Sélectionnez un épisode", "Cliquez sur une ligne de la liste pour ouvrir son espace de fichage.")
+            empty_state("Sélectionnez un épisode", "Cliquez sur un épisode de la liste pour ouvrir son espace de fichage.")
         else:
             render_workspace(episode)
 
@@ -787,7 +802,7 @@ def render_bilan() -> None:
         + kpi("calendar", str(len(episodes)), f"épisodes en {label}")
         + kpi("headphones", f"{listened} / {len(episodes)}", "épisodes écoutés")
         + kpi("file", str(len(fiches)), "fiches rédigées")
-        + kpi("star", f"{top} + {important}", "incontournables + importants", "kpi-accent")
+        + kpi("star", str(top), f"incontournable{'s' if top > 1 else ''} INSP · {plural(important, 'important')}", "kpi-accent")
         + "</div>"
     )
 
@@ -886,7 +901,7 @@ def render_exports(month: str, episodes: list[dict[str, Any]], shows: list[dict[
             if kind == EXPORT_CATEGORY:
                 sanitize_choice("export_show", show_ids)
                 show_id = choice_col.selectbox("Émission", show_ids, format_func=titles.get, key="export_show")
-            minimum = priority_col.selectbox("Épisodes retenus", list(MIN_PRIORITY_LABELS),
+            minimum = (priority_col if kind == EXPORT_CATEGORY else choice_col).selectbox("Épisodes retenus", list(MIN_PRIORITY_LABELS),
                                              format_func=MIN_PRIORITY_LABELS.get, key="export_min_priority")
             include_unfiched = st.checkbox(
                 "Inclure aussi les épisodes prioritaires sans fiche (résumé RSS seul)", key="export_include_unfiched"
@@ -907,9 +922,9 @@ def render_exports(month: str, episodes: list[dict[str, Any]], shows: list[dict[
             else:
                 details = f"{len(fiched)} fiche{'s' if len(fiched) > 1 else ''}"
                 if include_unfiched and missing:
-                    details += f" et {missing} épisode{'s' if missing > 1 else ''} sans fiche"
+                    details += f" et {plural(missing, 'épisode')} sans fiche"
                 elif missing:
-                    details += f" ({missing} épisode{'s' if missing > 1 else ''} prioritaire{'s' if missing > 1 else ''} sans fiche non inclus)"
+                    details += f" ({plural(missing, 'épisode')} sans fiche non inclus)"
                 st.caption(f"Le document contiendra {details}.")
                 if kind == EXPORT_CATEGORY:
                     document = exporter.category_document(titles[show_id], month, selection)
@@ -1004,7 +1019,7 @@ def render_show_settings(show: dict[str, Any]) -> None:
         nonce = st.session_state.get(f"logo_nonce_{show['id']}", 0)
         upload_col, remove_col = st.columns([3, 1.2], vertical_alignment="bottom")
         uploaded = upload_col.file_uploader("Image de couverture personnalisée", type=["png", "jpg", "jpeg", "webp"],
-                                            key=f"logo_{show['id']}_{nonce}")
+                                            key=f"logo_{show['id']}_{nonce}", max_upload_size=5)
         if uploaded is not None:
             _save_logo(show, uploaded)
             st.session_state[f"logo_nonce_{show['id']}"] = nonce + 1

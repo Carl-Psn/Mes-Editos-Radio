@@ -10,5 +10,19 @@ baseRadius = "0.75rem"
 buttonRadius = "full"
 showWidgetBorder = true
 
+# Couleurs des badges d'émission dans les libellés natifs (politique, éco, géopolitique, invité).
+redColor = "#E2001A"
+redBackgroundColor = "#FDECEE"
+redTextColor = "#C40017"
+greenColor = "#0F766E"
+greenBackgroundColor = "#E3F3F0"
+greenTextColor = "#0F766E"
+blueColor = "#1E3A8A"
+blueBackgroundColor = "#E8EDF8"
+blueTextColor = "#1E3A8A"
+violetColor = "#7B2D5B"
+violetBackgroundColor = "#F6E9F1"
+violetTextColor = "#7B2D5B"
+
 [browser]
 gatherUsageStats = false

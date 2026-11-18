@@ -226,7 +226,14 @@
 }
 
 .ep-headtext {
+  flex: 1;
   min-width: 0;
+}
+
+.badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ep-thumb {
@@ -262,12 +269,14 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
   max-width: 100%;
   padding: 3px 10px 3px 8px;
   border-radius: 999px;
@@ -588,6 +597,53 @@
   border-radius: 6px;
   background: rgba(17, 24, 39, 0.06);
   font-size: 0.82rem;
+}
+
+/* ------------------------------------------------- liste de l'atelier de fichage */
+
+.st-key-atelier_list {
+  gap: 0.5rem;
+  padding-right: 6px;
+}
+
+.st-key-atelier_list button {
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 11px 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  text-align: left;
+}
+
+.st-key-atelier_list button > div,
+.st-key-atelier_list button > div > span {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.st-key-atelier_list button [data-testid="stMarkdownContainer"] {
+  width: 100%;
+  text-align: left;
+}
+
+.st-key-atelier_list button p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.st-key-atelier_list button:hover,
+.st-key-atelier_list button:focus-visible {
+  border-color: #CBD0D8;
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+
+.st-key-atelier_list [class*="st-key-picksel_"] button {
+  border-color: var(--inter-red);
+  background: #FFF6F7;
+  box-shadow: inset 4px 0 0 var(--inter-red);
 }
 
 /* -------------------------------------------------------------------- fiches */
