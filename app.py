@@ -24,6 +24,7 @@ from PIL import Image, UnidentifiedImageError
 import ai_engine
 import database as db
 import exporter
+import fiche_import
 import rss_fetcher
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -709,6 +710,56 @@ def render_workspace(ep: dict[str, Any]) -> None:
         st.caption("Clé Gemini absente : ajoutez `GEMINI_API_KEY` dans `.streamlit/secrets.toml` pour activer la génération.")
     elif not has_audio:
         st.caption("Cet épisode n'a pas de fichier audio dans le flux RSS : la fiche ne peut être rédigée qu'à la main.")
+    elif configured and has_audio:
+        st.caption(
+            "La génération depuis l'audio est plus lente que la synthèse mensuelle : téléchargement du fichier, "
+            "envoi multimodale et analyse intégrale par Gemini (souvent plusieurs minutes, même avec un modèle Flash). "
+            "La synthèse ne s'appuie que sur du texte déjà en base."
+        )
+
+    with st.expander("Importer une fiche rédigée à la main", icon=":material/upload_file:", expanded=False):
+        st.caption(
+            "Fichiers acceptés : Markdown (`.md`) ou PDF. Le texte est extrait du PDF pour être stocké en Markdown "
+            "dans l'application (les exports restent Word et PDF)."
+        )
+        uploaded = st.file_uploader(
+            "Choisir un fichier",
+            type=["pdf", "md", "markdown", "txt"],
+            key=f"fiche_upload_{ep['id']}",
+            label_visibility="collapsed",
+            max_upload_size=15,
+        )
+        if uploaded:
+            st.caption(f"{uploaded.name} · {uploaded.size / 1024:.1f} Ko")
+        draft_col, save_col, _ = st.columns([1.4, 1.4, 1.2])
+        open_draft = draft_col.button(
+            "Ouvrir en brouillon",
+            icon=":material/draft:",
+            key=f"import_draft_{ep['id']}",
+            disabled=uploaded is None,
+            help="Charge le fichier dans l'éditeur pour relecture avant enregistrement.",
+        )
+        import_save = save_col.button(
+            "Importer et enregistrer",
+            icon=":material/save:",
+            key=f"import_save_{ep['id']}",
+            disabled=uploaded is None,
+            help="Enregistre directement la fiche sur cet épisode (remplace la fiche existante).",
+        )
+        if uploaded and (open_draft or import_save):
+            try:
+                imported = fiche_import.text_from_upload(uploaded.name, uploaded.getvalue())
+            except fiche_import.FicheImportError as exc:
+                st.error(str(exc))
+            else:
+                if import_save:
+                    db.save_fiche(ep["id"], imported)
+                    flash("Fiche importée et enregistrée.")
+                else:
+                    db.save_fiche_draft(ep["id"], imported)
+                    flash("Fiche importée : relisez le brouillon puis enregistrez si besoin.", ":material/upload_file:")
+                st.session_state[f"fiche_version_{ep['id']}"] = version + 1
+                st.rerun()
 
     if generate:
         with st.status("Génération de la fiche à partir de l'audio…", expanded=True) as status:
@@ -740,7 +791,8 @@ def render_workspace(ep: dict[str, Any]) -> None:
         else:
             sections = "".join(f'<div class="plan-item">{esc(section)}</div>' for section in ai_engine.FICHE_SECTIONS)
             render_html(f'<div class="fiche-plan"><div class="fiche-plan-title">{icon("layers")}Plan de la fiche INSP</div>'
-                    f'{sections}<div class="fiche-plan-note">Générez la fiche depuis l\'audio ou rédigez-la dans l\'onglet « Modifier le texte ».</div></div>')
+                    f'{sections}<div class="fiche-plan-note">Générez la fiche depuis l\'audio, importez un fichier '
+                    f'Markdown/PDF, ou rédigez dans l\'onglet « Modifier le texte ».</div></div>')
 
     dirty = text.strip() != saved
     save_col, discard_col, delete_col = st.columns([1.5, 1.5, 1.2])
