@@ -47,7 +47,12 @@ def fetch_transcript(episode_url: str) -> str:
     except requests.RequestException as exc:
         raise TranscriptError(f"Page de l'épisode inaccessible ({exc}).") from exc
 
-    html = response.text
+    # Radio France sert du UTF-8 mais l'en-tête HTTP peut induire requests en erreur (ISO-8859-1).
+    try:
+        html = response.content.decode("utf-8")
+    except UnicodeDecodeError:
+        response.encoding = response.apparent_encoding or "utf-8"
+        html = response.text
     paragraphs: list[str] = []
     seen: set[str] = set()
     for raw in _TEXT_CHUNK_RE.findall(html):
