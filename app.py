@@ -68,7 +68,7 @@ EXPORT_LABELS = {
 }
 MIN_PRIORITY_LABELS = {
     2: "Importants et incontournables (priorités 2 et 3)",
-    3: "Incontournables INSP uniquement (priorité 3)",
+    3: "Incontournables uniquement (priorité 3)",
     1: "Toutes les priorités (1 à 3)",
 }
 FICHE_FILTERS = ("Tous", "À ficher", "Fichés")
@@ -410,7 +410,7 @@ def render_masthead() -> None:
         <header class="masthead">
           <div class="brand">{_LOGO_SVG}
             <div>
-              <div class="brand-kicker">France Inter · Préparation au concours de l'INSP</div>
+              <div class="brand-kicker">France Inter · Carl PETERSEN</div>
               <div class="brand-title" role="heading" aria-level="1">Mes éditos du matin</div>
               <div class="brand-sub">Suivre, hiérarchiser et ficher les chroniques quotidiennes, du lundi au samedi.</div>
             </div>
@@ -840,7 +840,7 @@ def render_workspace(ep: dict[str, Any]) -> None:
                 st.markdown(text)
         else:
             sections = "".join(f'<div class="plan-item">{esc(section)}</div>' for section in ai_engine.FICHE_SECTIONS)
-            render_html(f'<div class="fiche-plan"><div class="fiche-plan-title">{icon("layers")}Plan de la fiche INSP</div>'
+            render_html(f'<div class="fiche-plan"><div class="fiche-plan-title">{icon("layers")}Plan de la fiche</div>'
                     f'{sections}<div class="fiche-plan-note">Générez la fiche depuis la retranscription, importez un '
                     f'fichier Markdown/PDF, ou rédigez dans l\'onglet « Modifier le texte ».</div></div>')
 
@@ -904,7 +904,7 @@ def render_bilan() -> None:
         + kpi("calendar", str(len(episodes)), f"épisode{'s' if len(episodes) > 1 else ''} en {label}")
         + kpi("headphones", f"{listened} / {len(episodes)}", "épisodes écoutés")
         + kpi("file", str(len(fiches)), "fiches rédigées" if len(fiches) > 1 else "fiche rédigée")
-        + kpi("star", str(top), f"incontournable{'s' if top > 1 else ''} INSP · {plural(important, 'important')}", "kpi-accent")
+        + kpi("star", str(top), f"incontournable{'s' if top > 1 else ''} · {plural(important, 'important')}", "kpi-accent")
         + "</div>"
     )
 
@@ -1278,7 +1278,7 @@ def render_parametres() -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="Mes éditos du matin · Préparation INSP",
+        page_title="Mes éditos du matin · Carl PETERSEN",
         page_icon=":material/radio:",
         layout="wide",
         initial_sidebar_state="collapsed",
