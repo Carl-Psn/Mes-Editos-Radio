@@ -231,11 +231,19 @@ def _state_name(file: types.File) -> str:
     return str(getattr(state, "name", state) or "").upper()
 
 
-def _wait_until_active(client: genai.Client, file: types.File) -> types.File:
+def _wait_until_active(
+    client: genai.Client,
+    file: types.File,
+    on_step: Callable[[str], None] | None = None,
+) -> types.File:
     deadline = time.monotonic() + FILE_READY_TIMEOUT
+    polls = 0
     while _state_name(file) == "PROCESSING":
         if time.monotonic() > deadline:
             raise AIEngineError("Gemini met trop de temps à préparer le fichier audio. Réessayez plus tard.")
+        polls += 1
+        if on_step and polls % 8 == 1:
+            on_step("Gemini prépare encore le fichier audio (étape souvent la plus longue)…")
         time.sleep(2)
         file = client.files.get(name=file.name)
     if _state_name(file) == "FAILED":
@@ -286,9 +294,9 @@ def generate_fiche(
 
         notify("Envoi de l'audio à Gemini…")
         uploaded = client.files.upload(file=local_path, config=types.UploadFileConfig(mime_type=mime_type))
-        uploaded = _wait_until_active(client, uploaded)
+        uploaded = _wait_until_active(client, uploaded, on_step=notify)
 
-        notify("Analyse de l'audio intégral et rédaction de la fiche…")
+        notify("Rédaction de la fiche à partir de l'audio (peut prendre quelques minutes)…")
         prompt = _FICHE_PROMPT.format(
             show=episode.get("show_title") or "Chronique France Inter",
             date=episode.get("pub_date") or "non précisée",

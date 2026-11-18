@@ -12,8 +12,11 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # puis renseigner G
 streamlit run app.py
 ```
 
-Sans clé Gemini, le suivi, la saisie manuelle des fiches et les exports fonctionnent ; seuls les deux
-boutons de génération par IA sont désactivés.
+Sans clé Gemini, le suivi, l'import ou la saisie manuelle des fiches et les exports fonctionnent ; seuls les
+deux boutons de génération par IA sont désactivés.
+
+Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche existante au format **Markdown**
+(`.md`) ou **PDF** (extraction du texte pour édition et export).
 
 ## Organisation du code
 
@@ -24,6 +27,7 @@ boutons de génération par IA sont désactivés.
 | `rss_fetcher.py` | Lecture des flux RSS, exclusion des dimanches, synchronisation |
 | `ai_engine.py` | Fiches depuis l'audio intégral et synthèse mensuelle (SDK `google-genai`) |
 | `exporter.py` | Exports Word (`python-docx`) et PDF (`fpdf2`) |
+| `fiche_import.py` | Import de fiches manuelles (Markdown, PDF via `pypdf`) |
 | `styles.css`, `.streamlit/config.toml` | Charte graphique |
 | `assets/` | Images de couverture personnalisées, déposées depuis l'onglet Paramètres |
 
