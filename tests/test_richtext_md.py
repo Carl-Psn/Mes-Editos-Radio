@@ -27,6 +27,23 @@ class RichTextMdTests(unittest.TestCase):
         self.assertIn("- Premier niveau", back)
         self.assertIn("    - Deuxième niveau", back)
 
+    def test_apostrophe_and_quotes_roundtrip(self) -> None:
+        source = 'L\'éditorial dit "y\'a un truc" autour de l\'économie.'
+        html = rt.markdown_to_html(source)
+        self.assertNotIn("&#x27;", html)
+        self.assertNotIn("&quot;", html)
+        self.assertIn("'", html)
+        back = rt.html_to_markdown(html)
+        self.assertIn("L'éditorial", back)
+        self.assertIn('"y\'a un truc"', back)
+        self.assertNotIn("&#x27;", back)
+
+    def test_unescape_legacy_entities(self) -> None:
+        legacy = "c&#x27;est &quot;normal&quot;"
+        html = rt.markdown_to_html(legacy)
+        self.assertIn("c'est", html)
+        self.assertIn('"normal"', html)
+
     def test_exporter_reads_underline_and_color(self) -> None:
         text = "A <u>souligné</u> et <span style=\"color:#2563EB\">bleu</span>"
         runs = exporter.parse_inline(text)

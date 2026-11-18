@@ -42,6 +42,23 @@ def _rgb_to_hex(value: str) -> str:
     return value
 
 
+def unescape_text(text: str) -> str:
+    """Remplace les entités HTML résiduelles (ex. &#x27;, &quot;) par les vrais caractères."""
+    if not text or "&" not in text:
+        return text
+    previous = None
+    current = text
+    while previous != current:
+        previous = current
+        current = html.unescape(current)
+    return current
+
+
+def _html_text(text: str) -> str:
+    """Échappe uniquement ce qui est dangereux en HTML ; les apostrophes et guillemets restent lisibles."""
+    return html.escape(text, quote=False)
+
+
 def normalize_color(value: str) -> str:
     value = (value or "").strip()
     if not value:
@@ -50,13 +67,14 @@ def normalize_color(value: str) -> str:
 
 
 def _inline_html(text: str) -> str:
+    text = unescape_text(text)
     if not text:
         return ""
     parts: list[str] = []
     pos = 0
     for match in _INLINE_HTML_RE.finditer(text):
         if match.start() > pos:
-            parts.append(html.escape(text[pos : match.start()]))
+            parts.append(_html_text(text[pos : match.start()]))
         if match.group("u") is not None:
             parts.append(f"<u>{_inline_html(match.group('u'))}</u>")
         elif match.group("c") is not None:
@@ -69,16 +87,16 @@ def _inline_html(text: str) -> str:
         elif match.group("i") is not None:
             parts.append(f"<em>{_inline_html(match.group('i'))}</em>")
         elif match.group("code") is not None:
-            parts.append(f"<code>{html.escape(match.group('code'))}</code>")
+            parts.append(f"<code>{_html_text(match.group('code'))}</code>")
         pos = match.end()
     if pos < len(text):
-        parts.append(html.escape(text[pos:]))
+        parts.append(_html_text(text[pos:]))
     return "".join(parts)
 
 
 def markdown_to_html(markdown: str) -> str:
     """Prépare le contenu pour l'éditeur visuel (HTML simple, sans Markdown visible)."""
-    lines = (markdown or "").replace("\r\n", "\n").split("\n")
+    lines = unescape_text(markdown or "").replace("\r\n", "\n").split("\n")
     blocks: list[str] = []
     para: list[str] = []
     in_list = False
@@ -150,7 +168,7 @@ def _li_indent(node: Tag) -> int:
 
 def _inline_to_markdown(node: Tag | NavigableString) -> str:
     if isinstance(node, NavigableString):
-        return html.escape(str(node).replace("\xa0", " "))
+        return str(node).replace("\xa0", " ")
 
     if not isinstance(node, Tag):
         return ""
@@ -240,7 +258,7 @@ def _list_item_to_markdown(node: Tag, blocks: list[str]) -> None:
 
 def html_to_markdown(fragment: str) -> str:
     """Ramène le HTML de l'éditeur vers le Markdown interne (titres, listes, styles en ligne)."""
-    text = (fragment or "").strip()
+    text = unescape_text((fragment or "").strip())
     if not text or text in {"<p><br></p>", "<p></p>", "<br>"}:
         return ""
     soup = BeautifulSoup(text, "html.parser")
@@ -250,7 +268,7 @@ def html_to_markdown(fragment: str) -> str:
         if isinstance(child, Tag):
             _block_to_markdown(child, blocks)
         elif isinstance(child, NavigableString) and str(child).strip():
-            blocks.append(html.escape(str(child).strip()))
+            blocks.append(str(child).strip())
     cleaned: list[str] = []
     for block in blocks:
         piece = block.rstrip()
@@ -260,7 +278,7 @@ def html_to_markdown(fragment: str) -> str:
             cleaned.append(piece)
         else:
             cleaned.append(piece.strip())
-    return "\n\n".join(cleaned)
+    return unescape_text("\n\n".join(cleaned))
 
 
 def preview_html(markdown: str) -> str:
