@@ -120,27 +120,6 @@
   color: var(--inter-red);
 }
 
-/* ------------------------------------------------------------------- onglets */
-
-.stTabs [data-baseweb="tab-list"] {
-  gap: 4px;
-}
-
-.stTabs [data-baseweb="tab"] {
-  height: auto;
-  padding: 10px 16px;
-  border-radius: 12px 12px 0 0;
-  font-weight: 600;
-}
-
-.stTabs [data-baseweb="tab"]:hover {
-  background: rgba(226, 0, 26, 0.05);
-}
-
-.stTabs [data-baseweb="tab-panel"] {
-  padding-top: 1.4rem;
-}
-
 /* -------------------------------------------------------------------- cartes */
 
 [class*="st-key-card_"],
@@ -215,6 +194,12 @@
 
 [class*="st-key-settings_"] {
   margin-bottom: 1rem;
+}
+
+/* Colonnes « Écouté » / priorité et mois / année : jamais repliées, sans largeur minimale imposée. */
+[class*="st-key-trackrow_"] [data-testid="stColumn"],
+[class*="_monthpick"] [data-testid="stColumn"] {
+  min-width: 0;
 }
 
 /* ------------------------------------------------------------------ épisodes */
@@ -829,9 +814,383 @@
 .dot-ok { background: var(--eco); }
 .dot-error { background: var(--inter-red); }
 
-@media (max-width: 760px) {
+/* --------------------------------------------------------------- écrans tactiles */
+
+@media (hover: none) {
+  [class*="st-key-card_"]:hover {
+    box-shadow: var(--shadow);
+    transform: none;
+  }
+
+  [class*="st-key-card_"][class*="_done_"]:hover {
+    box-shadow: none;
+  }
+}
+
+/* ------------------------------------------------- tablette et téléphone (< 1024 px) */
+
+@media (max-width: 1023px) {
+  /* Case « Écouté » et priorité côte à côte dès que la carte retrouve de la largeur. */
+  [class*="st-key-trackstack_"] {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  [class*="st-key-trackstack_"] > [data-testid="stElementContainer"] {
+    width: auto;
+  }
+
+  [class*="st-key-trackstack_"] > [data-testid="stElementContainer"]:first-child {
+    flex: none;
+  }
+
+  [class*="st-key-trackstack_"] > [data-testid="stElementContainer"]:last-child {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* Barre du suivi : le résumé du mois sur une ligne, les deux interrupteurs dessous, sans libellé tronqué. */
+  .st-key-suivi_toolbar > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {
+    gap: 0.6rem 1.5rem;
+  }
+
+  .st-key-suivi_toolbar > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .st-key-suivi_toolbar > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
+    flex: 1 1 100%;
+  }
+}
+
+/* ------------------------------------------------------ tablette (641 à 1023 px) */
+
+@media (min-width: 641px) and (max-width: 1023px) {
+  /* Deux cartes par ligne plutôt que trois ou quatre colonnes trop étroites. */
+  [class*="st-key-dayrow_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 0 1 calc(50% - 0.5rem);
+    min-width: calc(50% - 0.5rem);
+  }
+
+  [class*="st-key-dayrow_"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(> [data-testid="stVerticalBlock"]:empty) {
+    display: none;
+  }
+
+  .st-key-atelier_filters > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: calc(50% - 0.5rem);
+  }
+
+  .st-key-shows_grid > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+}
+
+/* --------------------------------------------------------- téléphone (≤ 640 px) */
+/* 640 px est le seuil sous lequel Streamlit empile lui-même ses colonnes. */
+
+@media (max-width: 640px) {
+  /* La barre d'outils Streamlit (60 px) reste fixe : on dégage le haut de page et on l'opacifie. */
+  .stMainBlockContainer {
+    padding-top: 4rem;
+    padding-bottom: 3rem;
+  }
+
+  [data-testid="stHeader"] {
+    background: rgba(248, 249, 250, 0.94);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Colonnes vides servant d'espacement sur grand écran. */
+  [data-testid="stColumn"]:has(> [data-testid="stVerticalBlock"]:empty) {
+    display: none;
+  }
+
+  /* ---- en-tête */
+
+  .masthead {
+    gap: 10px;
+    padding: 0 0 2px;
+  }
+
+  .brand {
+    gap: 12px;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand-kicker {
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+  }
+
   .brand-title {
-    font-size: 1.5rem;
+    margin: 1px 0 0;
+    font-size: 1.35rem;
+  }
+
+  .brand-sub,
+  .pill-extra {
+    display: none;
+  }
+
+  .masthead-stats {
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .stat-pill {
+    gap: 6px;
+    padding: 5px 11px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  /* ---- onglets principaux : quatre onglets visibles d'un coup, épinglés sous la barre d'outils */
+
+  .st-key-main_tabs > div > [role="tablist"] {
+    position: sticky;
+    top: 3.75rem;
+    z-index: 100;
+    gap: 0;
+    margin: 0 -1rem;
+    padding: 0 0.35rem;
+    background: rgba(248, 249, 250, 0.96);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .st-key-main_tabs > div > [role="tablist"] > [data-testid="stTab"] {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    height: auto;
+    padding: 6px 3px 8px;
+  }
+
+  .st-key-main_tabs > div > [role="tablist"] > [data-testid="stTab"] p {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    font-size: 0.68rem;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .st-key-main_tabs > div > [role="tablist"] > [data-testid="stTab"] p > span[role="img"] {
+    font-size: 1.2rem;
+  }
+
+  .st-key-main_tabs > [data-testid="stTabsScrollLeft"],
+  .st-key-main_tabs > [data-testid="stTabsScrollRight"] {
+    display: none;
+  }
+
+  /* ---- cartes */
+
+  [class*="st-key-card_"],
+  [class*="st-key-workspace_"],
+  [class*="st-key-settings_"],
+  [class*="st-key-fiche_preview_"],
+  .st-key-synthesis_card,
+  .st-key-export_card,
+  .st-key-add_show_card,
+  .st-key-sync_card,
+  .st-key-ai_card {
+    padding: 14px 14px 13px;
+    border-radius: 16px;
+  }
+
+  .ep-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+  }
+
+  .ep-thumb.large {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+  }
+
+  .ep-title {
+    margin-top: 10px;
+    font-size: 0.98rem;
+  }
+
+  .ws-title {
+    font-size: 1.08rem;
+  }
+
+  .ep-summary {
+    margin-top: 6px;
+    font-size: 0.84rem;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .ep-links {
+    gap: 18px;
+    margin-top: 8px;
+  }
+
+  .ep-link {
+    padding: 3px 0;
+    font-size: 0.84rem;
+  }
+
+  /* La case à cocher garde sa largeur utile, la liste de priorités prend le reste. */
+  [class*="st-key-trackrow_"] [data-testid="stColumn"]:first-child {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  [class*="st-key-trackrow_"] [data-testid="stColumn"]:last-child {
+    flex: 1 1 0;
+  }
+
+  /* Un libellé long passe à la ligne plutôt que d'être tronqué. */
+  .stButton button p,
+  .stDownloadButton button p {
+    white-space: normal;
+  }
+
+  /* ---- suivi mensuel */
+
+  .month-strip {
+    gap: 12px;
+    padding: 11px 14px;
+  }
+
+  .day-header {
+    margin-top: 1rem;
+  }
+
+  .day-name {
+    font-size: 1.08rem;
+  }
+
+  .day-date {
+    font-size: 0.88rem;
+  }
+
+  /* Les cases « pas d'épisode » n'ont d'intérêt que dans la grille par émission du grand écran. */
+  [class*="st-key-dayrow_"] [data-testid="stColumn"]:has(.slot-empty),
+  [class*="st-key-dayrow_"]:not(:has([class*="st-key-card_"])) {
+    display: none;
+  }
+
+  /* ---- atelier de fichage */
+
+  .st-key-atelier_filters > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {
+    gap: 0.6rem 0.75rem;
+  }
+
+  .st-key-atelier_filters > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 1 1 calc(50% - 0.75rem);
+    min-width: 0;
+  }
+
+  .st-key-atelier_fiche_filter button {
+    padding-right: 0.55rem;
+    padding-left: 0.55rem;
+  }
+
+  /* La liste devient un encadré court qui défile ; l'espace de fichage s'affiche juste dessous. */
+  [data-testid="stLayoutWrapper"]:has(> .st-key-atelier_list) {
+    flex: 0 0 auto;
+    height: auto;
+  }
+
+  .st-key-atelier_list {
+    height: auto;
+    max-height: min(44vh, 360px);
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #FCFCFD;
+  }
+
+  .st-key-atelier_list button {
+    padding: 9px 12px;
+    border-radius: 13px;
+  }
+
+  .st-key-atelier_list button p {
+    font-size: 0.86rem;
+  }
+
+  [class*="st-key-workspace_"] {
+    scroll-margin-top: 8.2rem;
+  }
+
+  .fiche-plan {
+    padding: 14px 16px;
+  }
+
+  /* ---- titres de section */
+
+  .section-title {
+    margin-top: 1rem;
+  }
+
+  .section-name {
+    font-size: 1.12rem;
+  }
+
+  .section-ico {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .empty-state {
+    padding: 28px 18px 26px;
+  }
+
+  /* ---- bilan */
+
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .kpi {
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .kpi-ico {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .kpi-value {
+    font-size: 1.2rem;
+  }
+
+  .kpi-label {
+    font-size: 0.76rem;
+    line-height: 1.3;
+  }
+
+  .show-rows {
+    padding: 14px;
   }
 
   .show-row {
@@ -841,5 +1200,6 @@
 
   .show-row-text {
     text-align: left;
+    white-space: normal;
   }
 }

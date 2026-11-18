@@ -162,6 +162,27 @@ def plural(count: int, singular: str, plural_form: str | None = None) -> str:
     return f"{count} {singular if count <= 1 else plural_form or singular + 's'}"
 
 
+# Sur téléphone, la liste de l'atelier et l'espace de fichage sont empilés : amène l'épisode choisi à l'écran.
+_SCROLL_TO_WORKSPACE_JS = """
+let tries = 0;
+const go = () => {
+  const target = document.querySelector('[class*="st-key-workspace_"]');
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  else if (tries++ < 20) setTimeout(go, 100);
+};
+go();
+"""
+
+def phone_script(body: str) -> None:
+    """Exécute un court script dans la page, uniquement sur écran de téléphone (même seuil que styles.css)."""
+    # Le compteur rend chaque balise unique : un script identique au précédent ne serait pas rejoué.
+    count = st.session_state["phone_script_count"] = st.session_state.get("phone_script_count", 0) + 1
+    st.html(
+        f'<script>(() => {{ /* {count} */ if (!window.matchMedia("(max-width: 640px)").matches) return; {body} }})();</script>',
+        unsafe_allow_javascript=True,
+    )
+
+
 def safe_url(url: str | None) -> str | None:
     return url if url and url.startswith(("http://", "https://")) else None
 
@@ -354,7 +375,8 @@ def month_selector(scope: str) -> str:
         st.session_state[f"{other}_month"] = st.session_state[month_key]
         st.session_state[f"{other}_year"] = st.session_state[year_key]
 
-    month_col, year_col, _spacer = st.columns([1.6, 1.1, 6])
+    with st.container(key=f"{scope}_monthpick"):
+        month_col, year_col, _spacer = st.columns([1.6, 1.1, 6], wrap=False)
     month_col.selectbox(
         "Mois",
         list(range(1, 13)),
@@ -394,7 +416,7 @@ def render_masthead() -> None:
             </div>
           </div>
           <div class="masthead-stats">
-            <div class="stat-pill">{icon("calendar")}<span><b>{len(episodes)}</b> épisode{"s" if len(episodes) > 1 else ""} en {esc(label)}</span></div>
+            <div class="stat-pill">{icon("calendar")}<span><b>{len(episodes)}</b> épisode{"s" if len(episodes) > 1 else ""}<span class="pill-extra"> en {esc(label)}</span></span></div>
             <div class="stat-pill">{icon("headphones")}<span><b>{listened}</b> écouté{"s" if listened > 1 else ""}</span></div>
             <div class="stat-pill">{icon("file")}<span><b>{fiches}</b> fiche{"s" if fiches > 1 else ""}</span></div>
           </div>
@@ -419,9 +441,11 @@ def tracking_controls(ep: dict[str, Any], scope: str, stacked: bool = False) -> 
     listened_key = f"{scope}_listened_{ep['id']}"
     priority_key = f"{scope}_priority_{ep['id']}"
     if stacked:
-        check_col = priority_col = st
+        # Empilés dans les colonnes étroites du bureau ; la feuille de style les remet en ligne sur téléphone.
+        check_col = priority_col = st.container(key=f"trackstack_{scope}_{ep['id']}")
     else:
-        check_col, priority_col = st.columns([1, 1.7], vertical_alignment="center")
+        with st.container(key=f"trackrow_{scope}_{ep['id']}"):
+            check_col, priority_col = st.columns([1, 1.7], vertical_alignment="center", wrap=False)
     check_col.checkbox(
         "Écouté",
         value=bool(ep["listened"]),
@@ -499,7 +523,8 @@ def render_suivi() -> None:
     listened = sum(1 for ep in episodes if ep["listened"])
     top = sum(1 for ep in episodes if ep["priority"] == 3)
     percent = round(100 * listened / len(episodes))
-    summary_col, order_col, hide_col = st.columns([5, 1.7, 1.7], vertical_alignment="center")
+    with st.container(key="suivi_toolbar"):
+        summary_col, order_col, hide_col = st.columns([5, 1.7, 1.7], vertical_alignment="center")
     render_html(
         f"""
         <div class="month-strip">
@@ -539,7 +564,8 @@ def render_suivi() -> None:
             continue
         for start in range(0, len(shows), MAX_COLUMNS):
             row = shows[start : start + MAX_COLUMNS]
-            columns = st.columns(max(len(row), 3))
+            with st.container(key=f"dayrow_{day.isoformat()}_{start}"):
+                columns = st.columns(max(len(row), 3))
             for column, show in zip(columns, row):
                 show_episodes = [ep for ep in visible if ep["show_id"] == show["id"]]
                 with column:
@@ -558,6 +584,7 @@ def render_suivi() -> None:
 
 def _select_episode(episode_id: int) -> None:
     st.session_state["atelier_episode_id"] = episode_id
+    st.session_state["atelier_scroll"] = True
 
 
 def episode_button_label(ep: dict[str, Any]) -> str:
@@ -595,7 +622,8 @@ def render_atelier() -> None:
     st.session_state.setdefault("atelier_period", current if current in months else "all")
 
     section_title("pen", "Atelier de fichage", "Choisissez un épisode, générez sa fiche puis relisez-la avant de l'enregistrer.")
-    show_col, priority_col, period_col, fiche_col = st.columns([2.2, 2.2, 1.5, 1.8])
+    with st.container(key="atelier_filters"):
+        show_col, priority_col, period_col, fiche_col = st.columns([2.2, 2.2, 1.5, 1.8])
     selected_shows = show_col.multiselect(
         "Émission", show_ids, format_func=titles.get, key="atelier_shows", placeholder="Toutes les émissions"
     )
@@ -652,6 +680,8 @@ def render_atelier() -> None:
             empty_state("Sélectionnez un épisode", "Cliquez sur un épisode de la liste pour ouvrir son espace de fichage.")
         else:
             render_workspace(episode)
+    if st.session_state.pop("atelier_scroll", False) and episode:
+        phone_script(_SCROLL_TO_WORKSPACE_JS)
 
 
 def render_workspace(ep: dict[str, Any]) -> None:
@@ -1149,7 +1179,8 @@ def render_parametres() -> None:
 
     shows = db.list_shows()
     section_title("rss", "Émissions suivies", "Le nom de chaque émission est lu dans le <title> de son flux RSS.")
-    columns = st.columns(2, gap="medium")
+    with st.container(key="shows_grid"):
+        columns = st.columns(2, gap="medium")
     for index, show in enumerate(shows):
         with columns[index % 2]:
             render_show_settings(show)
