@@ -799,9 +799,9 @@ def render_bilan() -> None:
     important = sum(1 for ep in episodes if ep["priority"] == 2)
     render_html(
         '<div class="kpi-grid">'
-        + kpi("calendar", str(len(episodes)), f"épisodes en {label}")
+        + kpi("calendar", str(len(episodes)), f"épisode{'s' if len(episodes) > 1 else ''} en {label}")
         + kpi("headphones", f"{listened} / {len(episodes)}", "épisodes écoutés")
-        + kpi("file", str(len(fiches)), "fiches rédigées")
+        + kpi("file", str(len(fiches)), "fiches rédigées" if len(fiches) > 1 else "fiche rédigée")
         + kpi("star", str(top), f"incontournable{'s' if top > 1 else ''} INSP · {plural(important, 'important')}", "kpi-accent")
         + "</div>"
     )
@@ -983,7 +983,7 @@ def render_show_settings(show: dict[str, Any]) -> None:
         status = f'<span class="status status-error">Dernière synchronisation en échec : {esc(show["last_error"])}</span>'
     elif show["last_synced_at"]:
         when = datetime.fromisoformat(show["last_synced_at"]).strftime("%d/%m/%Y à %Hh%M")
-        status = f'<span class="status">Synchronisée le {esc(when)} · {counts["episodes"]} épisodes · {counts["fiches"]} fiches</span>'
+        status = f'<span class="status">Synchronisée le {esc(when)} · {plural(counts["episodes"], "épisode")} · {plural(counts["fiches"], "fiche")}</span>'
     else:
         status = '<span class="status">Jamais synchronisée</span>'
 
@@ -1031,7 +1031,8 @@ def render_show_settings(show: dict[str, Any]) -> None:
 
         with st.popover("Supprimer cette émission", icon=":material/delete:"):
             st.write(
-                f"La suppression efface aussi ses {counts['episodes']} épisodes et ses {counts['fiches']} fiches. "
+                f"La suppression efface aussi les épisodes de cette émission ({counts['episodes']}) "
+                f"et ses fiches ({counts['fiches']}). "
                 "Pour la masquer sans rien perdre, désactivez simplement « Suivre »."
             )
             if st.button("Supprimer définitivement", type="primary", key=f"delete_show_{show['id']}"):
