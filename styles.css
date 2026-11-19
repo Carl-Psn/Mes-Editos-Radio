@@ -265,6 +265,78 @@
   }
 }
 
+/* --------------------------- suivi : la vignette d'un épisode ouvre son atelier de fichage */
+
+[class*="st-key-card_"] {
+  position: relative;
+}
+
+/* Vignette calée en haut de la carte, là où le bouton transparent est superposé. */
+[class*="st-key-card_"] .ep-head {
+  align-items: flex-start;
+}
+
+[class*="st-key-openfiche_"] {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 46px;
+  height: 46px;
+}
+
+/* Streamlit rend le bouton en deux variantes (avec ou sans infobulle) et masque lui-même celle qui ne sert pas. */
+[class*="st-key-openfiche_"] .stButton,
+[class*="st-key-openfiche_"] .stButton > div,
+[class*="st-key-openfiche_"] .stButton span:has(button) {
+  width: 100%;
+  height: 100%;
+}
+
+[class*="st-key-openfiche_"] button {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 13px;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+[class*="st-key-openfiche_"] button:hover,
+[class*="st-key-openfiche_"] button:focus-visible,
+[class*="st-key-openfiche_"] button:active {
+  border: none;
+  background: rgba(17, 24, 39, 0.62);
+  color: #FFFFFF;
+}
+
+[class*="st-key-openfiche_"] button > div,
+[class*="st-key-openfiche_"] button > div > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+}
+
+[class*="st-key-openfiche_"] button [data-testid="stIconMaterial"] {
+  margin: 0;
+  font-size: 24px;
+}
+
+/* Le libellé reste lisible par les lecteurs d'écran, sans s'afficher sur la vignette. */
+[class*="st-key-openfiche_"] button [data-testid="stMarkdownContainer"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 /* ------------------------------------------------------------------ épisodes */
 
 .ep-head {
@@ -1096,6 +1168,17 @@
   .ep-link {
     padding: 3px 0;
     font-size: 0.84rem;
+  }
+
+  [class*="st-key-openfiche_"] {
+    top: 14px;
+    left: 14px;
+    width: 40px;
+    height: 40px;
+  }
+
+  [class*="st-key-openfiche_"] button {
+    border-radius: 11px;
   }
 
   /* Un libellé long passe à la ligne plutôt que d'être tronqué. */

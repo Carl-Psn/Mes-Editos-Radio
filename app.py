@@ -183,14 +183,32 @@ const go = () => {
 go();
 """
 
-def phone_script(body: str) -> None:
-    """Exécute un court script dans la page, uniquement sur écran de téléphone (même seuil que styles.css)."""
+# À l'arrivée depuis un autre onglet : remonte en haut de page et amène l'épisode choisi en tête de liste.
+_REVEAL_SELECTED_JS = """
+let tries = 0;
+const go = () => {
+  const item = document.querySelector('[class*="st-key-picksel_"]');
+  if (!item) { if (tries++ < 20) setTimeout(go, 100); return; }
+  let box = item.parentElement;
+  while (box && !(box.scrollHeight > box.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(box).overflowY))) {
+    box = box.parentElement;
+  }
+  if (box && box.closest('[class*="st-key-main_tabs"]')) {
+    box.scrollTop += item.getBoundingClientRect().top - box.getBoundingClientRect().top - 8;
+  }
+  const main = document.querySelector('[data-testid="stMain"]');
+  if (main && !window.matchMedia("(max-width: 640px)").matches) main.scrollTo({ top: 0 });
+};
+go();
+"""
+
+
+def page_script(body: str, phone_only: bool = False) -> None:
+    """Exécute un court script dans la page, au besoin sur écran de téléphone seulement (seuil de styles.css)."""
     # Le compteur rend chaque balise unique : un script identique au précédent ne serait pas rejoué.
-    count = st.session_state["phone_script_count"] = st.session_state.get("phone_script_count", 0) + 1
-    st.html(
-        f'<script>(() => {{ /* {count} */ if (!window.matchMedia("(max-width: 640px)").matches) return; {body} }})();</script>',
-        unsafe_allow_javascript=True,
-    )
+    count = st.session_state["page_script_count"] = st.session_state.get("page_script_count", 0) + 1
+    guard = 'if (!window.matchMedia("(max-width: 640px)").matches) return; ' if phone_only else ""
+    st.html(f"<script>(() => {{ /* {count} */ {guard}{body} }})();</script>", unsafe_allow_javascript=True)
 
 
 def safe_url(url: str | None) -> str | None:
@@ -481,6 +499,26 @@ def episode_links_html(ep: dict[str, Any]) -> str:
     return f'<div class="ep-links">{"".join(links)}</div>' if links else ""
 
 
+def open_in_atelier(episode_id: int) -> None:
+    """Bascule sur l'atelier de fichage, centré sur cet épisode (rappel de bouton, exécuté avant le rendu)."""
+    ep = db.get_episode(episode_id)
+    if not ep:
+        return
+    # Seuls les filtres qui masqueraient l'épisode sont relâchés.
+    st.session_state["atelier_period"] = ep["pub_date"][:7]
+    if ep["show_id"] not in st.session_state.get("atelier_shows", [ep["show_id"]]):
+        st.session_state["atelier_shows"] = []
+    if ep["priority"] not in st.session_state.get("atelier_priorities", [ep["priority"]]):
+        st.session_state["atelier_priorities"] = []
+    has_fiche = bool((ep["fiche"] or "").strip())
+    if st.session_state.get("atelier_fiche_filter") == ("À ficher" if has_fiche else "Fichés"):
+        st.session_state["atelier_fiche_filter"] = FICHE_FILTERS[0]
+    st.session_state["atelier_episode_id"] = episode_id
+    st.session_state["atelier_scroll"] = True
+    st.session_state["atelier_reveal"] = True
+    st.session_state["main_tabs"] = TAB_ATELIER
+
+
 def episode_card(ep: dict[str, Any]) -> None:
     category = category_of(ep)
     state = "done" if ep["listened"] else "todo"
@@ -501,6 +539,15 @@ def episode_card(ep: dict[str, Any]) -> None:
             {summary}
             {episode_links_html(ep)}
             """
+        )
+        # Bouton transparent que la feuille de style superpose à la vignette de l'épisode.
+        st.button(
+            "Ouvrir dans l'atelier de fichage",
+            key=f"openfiche_{ep['id']}",
+            icon=":material/edit_note:",
+            help="Ouvrir cet épisode dans l'atelier de fichage",
+            on_click=open_in_atelier,
+            args=(ep["id"],),
         )
         tracking_controls(ep, "suivi")
 
@@ -685,8 +732,10 @@ def render_atelier() -> None:
             empty_state("Sélectionnez un épisode", "Cliquez sur un épisode de la liste pour ouvrir son espace de fichage.")
         else:
             render_workspace(episode)
+    if st.session_state.pop("atelier_reveal", False) and episode:
+        page_script(_REVEAL_SELECTED_JS)
     if st.session_state.pop("atelier_scroll", False) and episode:
-        phone_script(_SCROLL_TO_WORKSPACE_JS)
+        page_script(_SCROLL_TO_WORKSPACE_JS, phone_only=True)
 
 
 def render_workspace(ep: dict[str, Any]) -> None:
