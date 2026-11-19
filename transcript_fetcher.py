@@ -28,8 +28,9 @@ def _decode_chunk(raw: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _allowed_url(url: str) -> bool:
-    host = (urlparse(url).netloc or "").lower()
+def is_radiofrance_url(url: str | None) -> bool:
+    """Seules les pages radiofrance.fr publient une retranscription que l'on sait lire."""
+    host = (urlparse(url or "").netloc or "").lower()
     return host == "www.radiofrance.fr" or host.endswith(".radiofrance.fr")
 
 
@@ -38,7 +39,7 @@ def fetch_transcript(episode_url: str) -> str:
     url = (episode_url or "").strip()
     if not url.startswith("http"):
         raise TranscriptError("Aucun lien vers la page de l'épisode (champ « Page de l'épisode » du flux).")
-    if not _allowed_url(url):
+    if not is_radiofrance_url(url):
         raise TranscriptError("Seules les pages radiofrance.fr sont acceptées pour la retranscription.")
 
     try:

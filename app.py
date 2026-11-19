@@ -23,11 +23,13 @@ from PIL import Image, UnidentifiedImageError
 
 import ai_engine
 import database as db
+import episode_fetcher
 import exporter
 import fiche_import
 import richtext_md as rt
 from streamlit_quill import st_quill
 import rss_fetcher
+import transcript_fetcher
 
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
@@ -255,6 +257,9 @@ def badge(label: str, category: str) -> str:
 
 
 def time_label(published_at: str | None) -> str:
+    # Un épisode ajouté à l'unité peut n'avoir qu'une date, sans heure de diffusion.
+    if len(published_at or "") <= 10:
+        return ""
     try:
         moment = datetime.fromisoformat(published_at or "")
     except ValueError:
@@ -371,7 +376,7 @@ def auto_sync() -> None:
     if st.session_state.get("auto_sync_done"):
         return
     st.session_state["auto_sync_done"] = True
-    shows = db.list_shows(only_enabled=True)
+    shows = db.list_shows(only_enabled=True, feeds_only=True)
     if not shows:
         return
 
@@ -532,7 +537,7 @@ def episode_card(ep: dict[str, Any]) -> None:
               {thumb_html(ep)}
               <div class="ep-headtext">
                 <div class="ep-badges">{badge(ep["show_title"] or "Émission", category)}{fiche_chip}</div>
-                <div class="ep-meta">{icon("clock", 12)}{esc(meta)}</div>
+                {f'<div class="ep-meta">{icon("clock", 12)}{esc(meta)}</div>' if meta else ""}
               </div>
             </div>
             <div class="ep-title">{esc(ep["title"])}</div>
@@ -614,8 +619,13 @@ def render_suivi() -> None:
         if not day_episodes:
             render_html('<div class="day-empty">Aucun épisode synchronisé pour cette journée.</div>')
             continue
-        for start in range(0, len(shows), MAX_COLUMNS):
-            row = shows[start : start + MAX_COLUMNS]
+        # Les épisodes ajoutés à l'unité n'occupent une colonne que les jours où il y en a.
+        day_shows = [
+            show for show in shows
+            if not db.is_manual_show(show) or any(ep["show_id"] == show["id"] for ep in day_episodes)
+        ]
+        for start in range(0, len(day_shows), MAX_COLUMNS):
+            row = day_shows[start : start + MAX_COLUMNS]
             with st.container(key=f"dayrow_{day.isoformat()}_{start}"):
                 columns = st.columns(max(len(row), 3))
             for column, show in zip(columns, row):
@@ -815,7 +825,8 @@ def render_workspace(ep: dict[str, Any]) -> None:
     configured = ai_engine.is_configured()
     has_audio = bool(safe_url(ep["audio_url"]))
     has_page = bool(safe_url(ep.get("link")))
-    use_audio = fiche_source_audio()
+    # Hors radiofrance.fr, il n'y a pas de retranscription à lire : l'audio est alors la seule source possible.
+    use_audio = fiche_source_audio() or (has_audio and not transcript_fetcher.is_radiofrance_url(ep.get("link")))
     can_generate = configured and (has_audio if use_audio else has_page)
     generate_label = (
         "Générer la fiche IA (depuis l'audio intégral)"
@@ -1263,6 +1274,193 @@ def _update_show(show: dict[str, Any], url: str, category: str) -> None:
     st.rerun()
 
 
+def _reset_single_lookup() -> None:
+    st.session_state.pop("single_lookup", None)
+    st.session_state["single_url_nonce"] = st.session_state.get("single_url_nonce", 0) + 1
+
+
+def _confirm_single_episode(found: dict[str, Any]) -> None:
+    """Aperçu de l'épisode trouvé, champs corrigeables, puis enregistrement."""
+    nonce = st.session_state.get("single_nonce", 0)
+    episodes = found["episodes"]
+    index = 0
+    if found["from_feed"]:
+        index = st.selectbox(
+            f"Épisode à ajouter · {plural(len(episodes), 'épisode')} dans le flux « {found['show_title']} »",
+            range(len(episodes)),
+            format_func=lambda i: f"{date.fromisoformat(episodes[i]['pub_date']).strftime('%d/%m/%Y')} · {episodes[i]['title']}",
+            key=f"single_pick_{nonce}",
+        )
+    candidate = episodes[index]
+
+    existing = db.find_episode_by_link(candidate["guid"])
+    if existing:
+        st.info(
+            f"Cet épisode est déjà dans votre suivi : « {existing['title']} » "
+            f"({existing['show_title']}, {exporter.format_date_fr(existing['pub_date'])}).",
+            icon=":material/info:",
+        )
+        open_col, cancel_col, _ = st.columns([1.6, 1, 2.4])
+        open_col.button("Ouvrir dans l'atelier", icon=":material/edit_note:", key="single_open_existing",
+                        on_click=open_in_atelier, args=(existing["id"],), width="stretch")
+        cancel_col.button("Fermer", key="single_close", on_click=_reset_single_lookup, width="stretch")
+        return
+
+    category = rss_fetcher.guess_category(found["show_title"])
+    preview = {**candidate, "show_category": category}
+    meta = " · ".join(
+        part
+        for part in (
+            exporter.format_date_fr(candidate["pub_date"]) if candidate["pub_date"] else "",
+            time_label(candidate["published_at"]),
+            duration_label(candidate["duration"]),
+            candidate["author"],
+        )
+        if part
+    )
+    summary = f'<div class="ep-summary">{esc(candidate["summary"])}</div>' if candidate["summary"] else ""
+    render_html(
+        f"""
+        <div class="single-preview">
+          <div class="ep-head">
+            {thumb_html(preview, "ep-thumb large")}
+            <div class="ep-headtext">
+              <div class="ep-badges">{badge(found["show_title"] or "Podcast", category)}</div>
+              <div class="ws-title">{esc(candidate["title"])}</div>
+              <div class="ep-meta">{esc(meta)}</div>
+            </div>
+          </div>
+          {summary}
+        </div>
+        """
+    )
+    if safe_url(candidate["audio_url"]):
+        st.audio(candidate["audio_url"])
+    else:
+        st.caption(
+            "Aucun fichier audio n'a été trouvé sur cette page. Vérifiez qu'il s'agit bien de la page d'un épisode ; "
+            "vous pouvez aussi coller le lien du fichier audio ci-dessous."
+        )
+
+    options = list(db.CATEGORIES)
+    with st.form(f"single_form_{nonce}_{index}", border=False):
+        title_col, show_col = st.columns(2)
+        title = title_col.text_input("Titre", value=candidate["title"])
+        show = show_col.text_input("Émission ou podcast", value=found["show_title"])
+        date_col, category_col, audio_col = st.columns([1.2, 1.2, 2.6])
+        day = date_col.date_input(
+            "Date de diffusion",
+            value=date.fromisoformat(candidate["pub_date"]) if candidate["pub_date"] else None,
+            format="DD/MM/YYYY",
+        )
+        chosen_category = category_col.selectbox("Badge", options, index=options.index(category),
+                                                 format_func=CATEGORY_LABELS.get)
+        audio_url = audio_col.text_input("Lien du fichier audio (facultatif)", value=candidate["audio_url"] or "")
+        add_col, cancel_col, _ = st.columns([1.6, 1, 2.4])
+        add = add_col.form_submit_button("Ajouter cet épisode", type="primary", icon=":material/add:", width="stretch")
+        cancel = cancel_col.form_submit_button("Annuler", width="stretch")
+
+    if cancel:
+        _reset_single_lookup()
+        st.rerun()
+    if not add:
+        return
+    title, show, audio_url = title.strip(), show.strip(), audio_url.strip()
+    if not title or not show:
+        st.error("Le titre et le nom de l'émission sont obligatoires.")
+    elif day is None:
+        st.error("Indiquez la date de diffusion : elle n'a pas été trouvée sur la page.")
+    elif audio_url and not safe_url(audio_url):
+        st.error("Le lien du fichier audio doit commencer par http:// ou https://.")
+    else:
+        same_audio = audio_url == (candidate["audio_url"] or "")
+        episode = {
+            **candidate,
+            "title": title,
+            "pub_date": day.isoformat(),
+            # L'heure de diffusion ne vaut que pour la date trouvée sur la page.
+            "published_at": candidate["published_at"] if day.isoformat() == candidate["pub_date"] else day.isoformat(),
+            "audio_url": audio_url or None,
+            "audio_type": candidate["audio_type"] if same_audio else None,
+            "duration": candidate["duration"] if same_audio else None,
+        }
+        try:
+            db.add_single_episode(episode, show, chosen_category)
+        except sqlite3.IntegrityError:
+            st.error("Cet épisode a déjà été ajouté.")
+        else:
+            _reset_single_lookup()
+            flash(f"Épisode ajouté : il apparaît dans le suivi de {exporter.month_label(episode['pub_date'][:7])}.",
+                  ":material/playlist_add_check:")
+            st.rerun()
+
+
+def render_single_episodes() -> None:
+    """Ajout d'un épisode isolé d'un autre podcast, puis liste des épisodes déjà ajoutés ainsi."""
+    section_title("mic", "Ajouter un seul épisode", "Un épisode d'un autre podcast, sans suivre tout son flux RSS.")
+    with st.container(key="add_episode_card"):
+        with st.form("lookup_episode", border=False):
+            url_col, button_col = st.columns([3, 1.2], vertical_alignment="bottom")
+            url = url_col.text_input(
+                "Adresse de la page de l'épisode",
+                placeholder="https://www.radiofrance.fr/franceculture/podcasts/…",
+                key=f"single_url_{st.session_state.get('single_url_nonce', 0)}",
+            )
+            search = button_col.form_submit_button("Rechercher l'épisode", icon=":material/search:", width="stretch")
+        st.caption(
+            "Collez l'adresse de la page de l'épisode, sur radiofrance.fr ou un autre site. L'adresse d'un flux RSS "
+            "convient aussi : vous y choisirez l'épisode voulu, sans que le reste du flux soit ajouté."
+        )
+        if search:
+            try:
+                with st.spinner("Lecture de la page…"):
+                    found = episode_fetcher.lookup(url)
+            except episode_fetcher.EpisodeError as exc:
+                st.session_state.pop("single_lookup", None)
+                st.error(str(exc))
+            else:
+                st.session_state["single_lookup"] = dataclasses.asdict(found)
+                st.session_state["single_nonce"] = st.session_state.get("single_nonce", 0) + 1
+        if st.session_state.get("single_lookup"):
+            _confirm_single_episode(st.session_state["single_lookup"])
+
+    singles = db.list_single_episodes()
+    if not singles:
+        return
+    render_html(f'<div class="list-caption singles-caption">{plural(len(singles), "épisode ajouté", "épisodes ajoutés")} à l\'unité</div>')
+    for ep in singles:
+        category = category_of(ep)
+        fiche_chip = f'<span class="chip chip-fiche">{icon("file", 12)}Fiche</span>' if (ep["fiche"] or "").strip() else ""
+        with st.container(key=f"singlerow_{category}_{ep['id']}"):
+            info_col, buttons_col = st.columns([5, 2.4], vertical_alignment="center")
+            buttons = buttons_col.container(horizontal=True, horizontal_alignment="right")
+            render_html(
+                f"""
+                <div class="ep-head">
+                  {thumb_html(ep)}
+                  <div class="ep-headtext">
+                    <div class="ep-badges">{badge(ep["show_title"] or "Podcast", category)}{fiche_chip}
+                      <span class="ep-meta">{esc(exporter.format_date_fr(ep["pub_date"]))}</span></div>
+                    <div class="single-title">{esc(ep["title"])}</div>
+                  </div>
+                </div>
+                """,
+                info_col,
+            )
+            buttons.button("Ficher", icon=":material/edit_note:", key=f"single_open_{ep['id']}",
+                           help="Ouvrir cet épisode dans l'atelier de fichage",
+                           on_click=open_in_atelier, args=(ep["id"],))
+            with buttons.popover("Retirer", icon=":material/delete:"):
+                st.write(
+                    "Retirer cet épisode du suivi ?"
+                    + (" Sa fiche sera supprimée avec lui." if (ep["fiche"] or ep["fiche_draft"] or "").strip() else "")
+                )
+                if st.button("Oui, retirer l'épisode", type="primary", key=f"single_remove_{ep['id']}"):
+                    db.delete_single_episode(ep["id"])
+                    flash("Épisode retiré du suivi.", ":material/delete:")
+                    st.rerun()
+
+
 def render_parametres() -> None:
     pending = st.session_state.pop("pending_sync", None)
     if pending is not None:
@@ -1270,7 +1468,7 @@ def render_parametres() -> None:
         if show:
             run_sync([show])
 
-    shows = db.list_shows()
+    shows = db.list_shows(feeds_only=True)
     section_title("rss", "Émissions suivies", "Le nom de chaque émission est lu dans le <title> de son flux RSS.")
     with st.container(key="shows_grid"):
         columns = st.columns(2, gap="medium")
@@ -1308,6 +1506,8 @@ def render_parametres() -> None:
                 else:
                     run_sync([db.get_show(show_id)])
                     st.rerun()
+
+    render_single_episodes()
 
     section_title("rss", "Synchronisation", "Les flux sont relevés automatiquement à l'ouverture, au plus une fois par heure.")
     with st.container(key="sync_card"):

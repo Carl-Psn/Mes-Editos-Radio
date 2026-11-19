@@ -136,6 +136,7 @@
 .st-key-synthesis_card,
 .st-key-export_card,
 .st-key-add_show_card,
+.st-key-add_episode_card,
 .st-key-sync_card,
 .st-key-ai_card {
   padding: 18px 18px 16px;
@@ -916,6 +917,37 @@
   color: var(--inter-red);
 }
 
+/* Épisodes ajoutés à l'unité : aperçu avant ajout, puis liste des épisodes déjà ajoutés. */
+.single-preview {
+  padding: 14px 16px;
+  border: 1px dashed #D5D9E0;
+  border-radius: 16px;
+  background: #FCFCFD;
+}
+
+.singles-caption {
+  margin-top: 0.6rem;
+}
+
+[class*="st-key-singlerow_"] {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+[class*="st-key-singlerow_"] .ep-meta {
+  margin-top: 0;
+}
+
+.single-title {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
 .sync-report {
   margin-top: 4px;
 }
@@ -1126,6 +1158,7 @@
   .st-key-synthesis_card,
   .st-key-export_card,
   .st-key-add_show_card,
+  .st-key-add_episode_card,
   .st-key-sync_card,
   .st-key-ai_card {
     padding: 14px 14px 13px;

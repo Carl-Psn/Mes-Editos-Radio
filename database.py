@@ -21,6 +21,11 @@ PRIORITY_LABELS = {
 }
 DEFAULT_PRIORITY = 1
 
+# Émission interne qui regroupe les épisodes ajoutés à l'unité (hors flux RSS suivis). Elle n'est jamais
+# synchronisée ; chaque épisode y garde le nom et le badge de son podcast d'origine (colonnes source_*).
+MANUAL_FEED_URL = "local://episodes-a-l-unite"
+MANUAL_SHOW_TITLE = "Épisodes à l'unité"
+
 # Les trois chroniques quotidiennes suivies par défaut. Leur nom et leur catégorie
 # sont déduits du <title> de chaque flux lors de la première synchronisation.
 DEFAULT_FEEDS: tuple[dict[str, Any], ...] = (
@@ -77,6 +82,8 @@ CREATE TABLE IF NOT EXISTS episodes (
     fiche            TEXT,
     fiche_draft      TEXT,
     fiche_updated_at TEXT,
+    source_title     TEXT,
+    source_category  TEXT,
     UNIQUE (show_id, guid)
 );
 
@@ -96,8 +103,8 @@ CREATE TABLE IF NOT EXISTS settings (
 
 _EPISODE_SELECT = """
 SELECT e.*,
-       s.title       AS show_title,
-       s.category    AS show_category,
+       COALESCE(e.source_title, s.title)       AS show_title,
+       COALESCE(e.source_category, s.category) AS show_category,
        s.image_url   AS show_image_url,
        s.custom_logo AS show_custom_logo,
        s.rss_url     AS show_rss_url
@@ -130,6 +137,11 @@ def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as conn:
         conn.executescript(_SCHEMA)
+        # Bases créées avant l'ajout d'épisodes à l'unité.
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(episodes)")}
+        for column in ("source_title", "source_category"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE episodes ADD COLUMN {column} TEXT")
         if conn.execute("SELECT COUNT(*) FROM shows").fetchone()[0] == 0:
             for position, feed in enumerate(DEFAULT_FEEDS):
                 conn.execute(
@@ -141,13 +153,21 @@ def init_db() -> None:
 # --------------------------------------------------------------------------- émissions
 
 
-def list_shows(only_enabled: bool = False) -> list[dict[str, Any]]:
-    query = "SELECT * FROM shows"
+def is_manual_show(show: dict[str, Any]) -> bool:
+    return show.get("rss_url") == MANUAL_FEED_URL
+
+
+def list_shows(only_enabled: bool = False, feeds_only: bool = False) -> list[dict[str, Any]]:
+    """Émissions dans l'ordre d'affichage. `feeds_only` écarte le regroupement des épisodes ajoutés à l'unité."""
+    clauses = []
     if only_enabled:
-        query += " WHERE enabled = 1"
-    query += " ORDER BY position, id"
+        clauses.append("enabled = 1")
+    if feeds_only:
+        clauses.append("rss_url <> :manual")
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    query = f"SELECT * FROM shows{where} ORDER BY rss_url = :manual, position, id"
     with connect() as conn:
-        return [dict(row) for row in conn.execute(query)]
+        return [dict(row) for row in conn.execute(query, {"manual": MANUAL_FEED_URL})]
 
 
 def get_show(show_id: int) -> dict[str, Any] | None:
@@ -260,6 +280,82 @@ def upsert_episodes(show_id: int, episodes: Iterable[dict[str, Any]]) -> tuple[i
                 )
                 inserted += 1
     return inserted, known
+
+
+def find_episode_by_link(link: str) -> dict[str, Any] | None:
+    """Épisode déjà suivi pour cette page web, qu'il vienne d'un flux actif ou d'un ajout à l'unité."""
+    with connect() as conn:
+        row = conn.execute(
+            f"{_EPISODE_SELECT} WHERE s.enabled = 1 AND (e.link = :link OR e.guid = :link) ORDER BY e.id LIMIT 1",
+            {"link": link},
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def add_single_episode(episode: dict[str, Any], source_title: str, source_category: str) -> int:
+    """Enregistre un épisode isolé, sans suivre le flux de son podcast. Retourne son identifiant.
+
+    Lève sqlite3.IntegrityError si cet épisode a déjà été ajouté à l'unité.
+    """
+    with connect() as conn:
+        row = conn.execute("SELECT id FROM shows WHERE rss_url = ?", (MANUAL_FEED_URL,)).fetchone()
+        if row:
+            show_id = row["id"]
+        else:
+            position = conn.execute("SELECT COALESCE(MAX(position), -1) + 1 FROM shows").fetchone()[0]
+            show_id = conn.execute(
+                "INSERT INTO shows (rss_url, title, category, enabled, position) VALUES (?, ?, 'autre', 1, ?)",
+                (MANUAL_FEED_URL, MANUAL_SHOW_TITLE, position),
+            ).lastrowid
+        cursor = conn.execute(
+            """
+            INSERT INTO episodes (show_id, guid, title, published_at, pub_date, summary, author, audio_url,
+                                  audio_type, image_url, duration, link, priority, source_title, source_category)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                show_id,
+                episode["guid"],
+                episode["title"],
+                episode["published_at"],
+                episode["pub_date"],
+                episode.get("summary"),
+                episode.get("author"),
+                episode.get("audio_url"),
+                episode.get("audio_type"),
+                episode.get("image_url"),
+                episode.get("duration"),
+                episode.get("link"),
+                DEFAULT_PRIORITY,
+                source_title,
+                source_category,
+            ),
+        )
+        return int(cursor.lastrowid)
+
+
+def list_single_episodes() -> list[dict[str, Any]]:
+    """Épisodes ajoutés à l'unité, du plus récent au plus ancien."""
+    query = (
+        f"{_EPISODE_SELECT} WHERE s.rss_url = ? "
+        "ORDER BY e.pub_date DESC, e.published_at DESC, e.id DESC"
+    )
+    with connect() as conn:
+        return [dict(row) for row in conn.execute(query, (MANUAL_FEED_URL,))]
+
+
+def delete_single_episode(episode_id: int) -> None:
+    """Supprime un épisode ajouté à l'unité (et sa fiche). Les épisodes issus d'un flux ne sont pas concernés."""
+    with connect() as conn:
+        conn.execute(
+            "DELETE FROM episodes WHERE id = ? AND show_id IN (SELECT id FROM shows WHERE rss_url = ?)",
+            (episode_id, MANUAL_FEED_URL),
+        )
+        # Sans épisode, le regroupement n'a plus lieu d'apparaître dans les filtres et le bilan.
+        conn.execute(
+            "DELETE FROM shows WHERE rss_url = ? AND id NOT IN (SELECT show_id FROM episodes)",
+            (MANUAL_FEED_URL,),
+        )
 
 
 def list_episodes(
