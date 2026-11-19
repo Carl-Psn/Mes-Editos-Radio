@@ -738,6 +738,32 @@ def render_atelier() -> None:
         page_script(_SCROLL_TO_WORKSPACE_JS, phone_only=True)
 
 
+def fiche_export_buttons(ep: dict[str, Any], text: str) -> None:
+    """Export direct de la fiche affichée, en Word ou en PDF : même document que « La fiche d'un seul édito » du bilan."""
+    document = exporter.single_fiche_document({**ep, "fiche": text})
+    formats = (
+        ("docx", "Word", "Word (.docx)", exporter.DOCX_MIME, exporter.build_docx),
+        ("pdf", "PDF", "PDF (.pdf)", exporter.PDF_MIME, exporter.build_pdf),
+    )
+    for file_format, label, long_label, mime, build in formats:
+        st.download_button(
+            label,
+            # Le fichier n'est fabriqué qu'au clic, pas à chaque affichage de l'atelier.
+            data=lambda build=build: build(document),
+            file_name=f"{document.filename_stem}.{file_format}",
+            mime=mime,
+            icon=":material/download:",
+            key=f"fiche_export_{file_format}_{ep['id']}",
+            on_click="ignore",
+            disabled=not text.strip(),
+            help=(
+                f"Exporter la fiche affichée au format {long_label}."
+                if text.strip()
+                else "Rédigez, générez ou importez d'abord la fiche pour pouvoir l'exporter."
+            ),
+        )
+
+
 def render_workspace(ep: dict[str, Any]) -> None:
     category = category_of(ep)
     meta = " · ".join(
@@ -801,7 +827,9 @@ def render_workspace(ep: dict[str, Any]) -> None:
         if use_audio
         else "Lit la retranscription publiée sur la page Radio France de l'épisode, puis rédige la fiche (beaucoup plus rapide)."
     )
-    generate = st.button(
+    # Les boutons d'export rejoignent cette rangée plus bas, une fois lu le texte présent dans l'éditeur.
+    actions = st.container(key=f"fiche_actions_{ep['id']}", horizontal=True, vertical_alignment="center")
+    generate = actions.button(
         generate_label,
         type="primary",
         icon=":material/auto_awesome:",
@@ -897,6 +925,8 @@ def render_workspace(ep: dict[str, Any]) -> None:
         if html_value is not None:
             st.session_state[body_key] = html_value
     text = rt.html_to_markdown(st.session_state.get(body_key, ""))
+    with actions:
+        fiche_export_buttons(ep, text)
     with preview_tab:
         if text.strip():
             with st.container(key=f"fiche_preview_{ep['id']}"):
