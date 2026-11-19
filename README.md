@@ -27,6 +27,7 @@ Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche ex
 | `rss_fetcher.py` | Lecture des flux RSS, exclusion des dimanches, synchronisation |
 | `ai_engine.py` | Fiches depuis la retranscription Radio France (défaut) ou l'audio, synthèse mensuelle (`google-genai`) |
 | `transcript_fetcher.py` | Extraction de la retranscription sur la page web de l'épisode |
+| `episode_fetcher.py` | Ajout d'un épisode à l'unité : lecture de la page web d'un épisode, ou d'un flux RSS où le choisir |
 | `exporter.py` | Exports Word (`python-docx`) et PDF (`fpdf2`) |
 | `fiche_import.py` | Import de fiches manuelles (Markdown, PDF via `pypdf`) |
 | `styles.css`, `.streamlit/config.toml` | Charte graphique |
@@ -37,8 +38,16 @@ Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche ex
 - Les flux Radio France ne remontent que quelques semaines en arrière : l'historique se constitue
   dans la base locale au fil des synchronisations (automatique à l'ouverture, au plus une fois par
   heure, ou forcée depuis l'onglet Paramètres).
-- Les nouveaux épisodes arrivent en priorité « 1 - Secondaire ». Les exports « prioritaires »
-  retiennent par défaut les priorités 2 et 3 ; ce seuil se règle dans le module d'export.
+- Les nouveaux épisodes arrivent en priorité « 1 - Secondaire » (une étoile). La priorité se règle en
+  cliquant sur les étoiles de l'épisode : deux pour « Important », trois pour « Incontournable ». Les exports
+  « prioritaires » retiennent par défaut les priorités 2 et 3 ; ce seuil se règle dans le module d'export.
+- Dans le suivi mensuel, un clic sur la vignette d'un épisode ouvre l'atelier de fichage sur cet épisode.
+- Dans l'atelier, les boutons **Word** et **PDF** placés à côté de « Générer la fiche IA » exportent la fiche
+  affichée, sans passer par l'onglet Bilan.
+- L'onglet Paramètres permet d'ajouter **un seul épisode** d'un autre podcast, sans suivre tout son flux :
+  collez l'adresse de la page de l'épisode (radiofrance.fr ou autre site), ou celle d'un flux RSS pour y
+  choisir un épisode. Ces épisodes ne sont jamais resynchronisés ; hors radiofrance.fr, faute de
+  retranscription, leur fiche IA est générée depuis l'audio.
 - Les fiches IA s'appuient par défaut sur la **retranscription** de la page `radiofrance.fr` de l'épisode (plus rapide que l'audio). Le mode audio reste disponible dans Paramètres.
 - Le modèle Gemini utilisé (`gemini-3.5-flash-lite` par défaut) se change dans l'onglet Paramètres ; en cas d'erreur 503, l'app réessaie et peut basculer sur un modèle de secours.
 - L'onglet **Modifier le texte** de l'atelier propose un éditeur visuel (gras, italique, souligné, couleur, titres,
