@@ -442,37 +442,32 @@ def _on_listened(episode_id: int, key: str) -> None:
     db.set_listened(episode_id, bool(st.session_state[key]))
 
 
-def _on_priority(episode_id: int, key: str) -> None:
-    db.set_priority(episode_id, int(st.session_state[key]))
-
-
-def tracking_controls(ep: dict[str, Any], scope: str, stacked: bool = False) -> None:
-    """Case « Écouté » et sélecteur de priorité, enregistrés dès qu'ils changent."""
+def tracking_controls(ep: dict[str, Any], scope: str) -> None:
+    """Case « Écouté » et étoiles de priorité, enregistrées dès qu'elles changent."""
     listened_key = f"{scope}_listened_{ep['id']}"
-    priority_key = f"{scope}_priority_{ep['id']}"
-    if stacked:
-        # Empilés dans les colonnes étroites du bureau ; la feuille de style les remet en ligne sur téléphone.
-        check_col = priority_col = st.container(key=f"trackstack_{scope}_{ep['id']}")
-    else:
-        with st.container(key=f"trackrow_{scope}_{ep['id']}"):
-            check_col, priority_col = st.columns([1, 1.7], vertical_alignment="center", wrap=False)
-    check_col.checkbox(
-        "Écouté",
-        value=bool(ep["listened"]),
-        key=listened_key,
-        on_change=_on_listened,
-        args=(ep["id"], listened_key),
-    )
-    priority_col.selectbox(
-        "Priorité",
-        list(db.PRIORITY_LABELS),
-        index=list(db.PRIORITY_LABELS).index(ep["priority"]),
-        format_func=db.PRIORITY_LABELS.get,
-        key=priority_key,
-        on_change=_on_priority,
-        args=(ep["id"], priority_key),
-        label_visibility="collapsed",
-    )
+    # Côte à côte quand la carte est assez large, l'un sous l'autre sinon.
+    with st.container(key=f"track_{scope}_{ep['id']}", horizontal=True, vertical_alignment="center"):
+        st.checkbox(
+            "Écouté",
+            value=bool(ep["listened"]),
+            key=listened_key,
+            on_change=_on_listened,
+            args=(ep["id"], listened_key),
+        )
+        with st.container(key=f"stars_{scope}_{ep['id']}", horizontal=True, wrap=False, width="content",
+                          vertical_alignment="center", gap=None):
+            st.markdown("Priorité :", width="content")
+            for level, name in db.PRIORITY_LABELS.items():
+                # L'état figure dans la clé pour que la feuille de style colore les étoiles allumées.
+                state = "on" if level <= ep["priority"] else "off"
+                st.button(
+                    "★",
+                    key=f"star_{state}_n{level}_{scope}_{ep['id']}",
+                    type="tertiary",
+                    help=f"Priorité {name.replace(' - ', ' · ')}",
+                    on_click=db.set_priority,
+                    args=(ep["id"], level),
+                )
 
 
 def episode_links_html(ep: dict[str, Any]) -> str:
@@ -486,7 +481,7 @@ def episode_links_html(ep: dict[str, Any]) -> str:
     return f'<div class="ep-links">{"".join(links)}</div>' if links else ""
 
 
-def episode_card(ep: dict[str, Any], narrow: bool = False) -> None:
+def episode_card(ep: dict[str, Any]) -> None:
     category = category_of(ep)
     state = "done" if ep["listened"] else "todo"
     meta = " · ".join(part for part in (time_label(ep["published_at"]), duration_label(ep["duration"])) if part)
@@ -507,7 +502,7 @@ def episode_card(ep: dict[str, Any], narrow: bool = False) -> None:
             {episode_links_html(ep)}
             """
         )
-        tracking_controls(ep, "suivi", stacked=narrow)
+        tracking_controls(ep, "suivi")
 
 
 def render_suivi() -> None:
@@ -584,7 +579,7 @@ def render_suivi() -> None:
                         text = "Déjà écouté" if has_hidden else "Pas d'épisode ce jour-là"
                         render_html(f'<div class="slot-empty"><b>{esc(show_name(show))}</b><span>{text}</span></div>')
                     for ep in show_episodes:
-                        episode_card(ep, narrow=len(columns) > 3)
+                        episode_card(ep)
     if shown == 0:
         empty_state("Tout est écouté", "Aucun épisode en attente d'écoute sur ce mois.")
 

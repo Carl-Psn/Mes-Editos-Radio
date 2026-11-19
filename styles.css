@@ -203,10 +203,66 @@
   margin-bottom: 1rem;
 }
 
-/* Colonnes « Écouté » / priorité et mois / année : jamais repliées, sans largeur minimale imposée. */
-[class*="st-key-trackrow_"] [data-testid="stColumn"],
+/* Colonnes mois / année : jamais repliées, sans largeur minimale imposée. */
 [class*="_monthpick"] [data-testid="stColumn"] {
   min-width: 0;
+}
+
+/* ------------------------------------------- suivi : case « Écouté » et étoiles de priorité */
+
+[class*="st-key-track_"] {
+  gap: 0.35rem 1.1rem;
+}
+
+[class*="st-key-stars_"] p {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+[class*="st-key-stars_"] > [data-testid="stElementContainer"]:first-child {
+  margin-right: 5px;
+}
+
+[class*="st-key-star_"] button {
+  min-height: 0;
+  padding: 2px 1px;
+  border: none;
+  background: none;
+  color: #D5D9E0;
+  line-height: 1;
+  transition: color 0.12s ease, transform 0.12s ease;
+}
+
+[class*="st-key-star_"] button p {
+  color: inherit;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+[class*="st-key-star_on_"] button,
+[class*="st-key-star_"] button:focus-visible {
+  color: var(--inter-red);
+}
+
+[class*="st-key-star_"] button:active {
+  transform: scale(0.88);
+}
+
+/* Au survol, les étoiles s'allument jusqu'à celle qui est pointée, pour annoncer la priorité qui sera choisie. */
+@media (hover: hover) {
+  [class*="st-key-star_"] button:hover,
+  [class*="st-key-stars_"]:has([class*="_n2_"] button:hover) [class*="_n1_"] button,
+  [class*="st-key-stars_"]:has([class*="_n3_"] button:hover) [class*="_n1_"] button,
+  [class*="st-key-stars_"]:has([class*="_n3_"] button:hover) [class*="_n2_"] button {
+    color: var(--inter-red);
+  }
+
+  [class*="st-key-stars_"]:has([class*="_n1_"] button:hover) [class*="_n2_"] button,
+  [class*="st-key-stars_"]:has([class*="_n1_"] button:hover) [class*="_n3_"] button,
+  [class*="st-key-stars_"]:has([class*="_n2_"] button:hover) [class*="_n3_"] button {
+    color: #D5D9E0;
+  }
 }
 
 /* ------------------------------------------------------------------ épisodes */
@@ -832,31 +888,16 @@
   [class*="st-key-card_"][class*="_done_"]:hover {
     box-shadow: none;
   }
+
+  /* Étoiles plus faciles à toucher du doigt. */
+  [class*="st-key-star_"] button {
+    padding: 7px 4px;
+  }
 }
 
 /* ------------------------------------------------- tablette et téléphone (< 1024 px) */
 
 @media (max-width: 1023px) {
-  /* Case « Écouté » et priorité côte à côte dès que la carte retrouve de la largeur. */
-  [class*="st-key-trackstack_"] {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  [class*="st-key-trackstack_"] > [data-testid="stElementContainer"] {
-    width: auto;
-  }
-
-  [class*="st-key-trackstack_"] > [data-testid="stElementContainer"]:first-child {
-    flex: none;
-  }
-
-  [class*="st-key-trackstack_"] > [data-testid="stElementContainer"]:last-child {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
   /* Barre du suivi : le résumé du mois sur une ligne, les deux interrupteurs dessous, sans libellé tronqué. */
   .st-key-suivi_toolbar > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {
     gap: 0.6rem 1.5rem;
@@ -1055,16 +1096,6 @@
   .ep-link {
     padding: 3px 0;
     font-size: 0.84rem;
-  }
-
-  /* La case à cocher garde sa largeur utile, la liste de priorités prend le reste. */
-  [class*="st-key-trackrow_"] [data-testid="stColumn"]:first-child {
-    flex: 0 0 auto;
-    width: auto;
-  }
-
-  [class*="st-key-trackrow_"] [data-testid="stColumn"]:last-child {
-    flex: 1 1 0;
   }
 
   /* Un libellé long passe à la ligne plutôt que d'être tronqué. */
