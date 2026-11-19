@@ -122,8 +122,8 @@ def _image_href(node: Any) -> str | None:
     return image.get("href") or image.get("url")
 
 
-def parse_feed(content: bytes | str) -> ParsedFeed:
-    """Analyse un flux et ne conserve que les épisodes diffusés du lundi au samedi."""
+def parse_feed(content: bytes | str, keep_sundays: bool = False) -> ParsedFeed:
+    """Analyse un flux et, sauf demande contraire, ne conserve que les épisodes diffusés du lundi au samedi."""
     parsed = feedparser.parse(content)
     feed_title = (parsed.feed.get("title") or "").strip()
     if not feed_title and not parsed.entries:
@@ -138,7 +138,7 @@ def parse_feed(content: bytes | str) -> ParsedFeed:
         published = _published_datetime(entry)
         if published is None:
             continue
-        if published.weekday() == SUNDAY:
+        if published.weekday() == SUNDAY and not keep_sundays:
             result.skipped_sundays += 1
             continue
 
@@ -201,5 +201,5 @@ def sync_show(show: dict[str, Any]) -> SyncReport:
 
 
 def sync_all() -> list[SyncReport]:
-    """Synchronise toutes les émissions actives."""
-    return [sync_show(show) for show in db.list_shows(only_enabled=True)]
+    """Synchronise toutes les émissions actives (les épisodes ajoutés à l'unité n'ont pas de flux)."""
+    return [sync_show(show) for show in db.list_shows(only_enabled=True, feeds_only=True)]
