@@ -44,6 +44,23 @@ class RichTextMdTests(unittest.TestCase):
         self.assertIn("c'est", html)
         self.assertIn('"normal"', html)
 
+    def test_nested_section3_lists_roundtrip(self) -> None:
+        source = (
+            "## 3. Enjeux\n\n"
+            "- **Notions liées**\n"
+            "  - Souveraineté numérique\n"
+            "  - État stratège\n"
+            "- **Sujets possibles**\n"
+            "    - Composition\n"
+        )
+        html = rt.markdown_to_html(source)
+        self.assertIn('data-indent="1"', html)
+        self.assertIn("ql-indent-1", html)
+        back = rt.html_to_markdown(html)
+        self.assertIn("- **Notions liées**", back)
+        self.assertIn("    - Souveraineté numérique", back)
+        self.assertIn("    - Composition", back)
+
     def test_exporter_reads_underline_and_color(self) -> None:
         text = "A <u>souligné</u> et <span style=\"color:#2563EB\">bleu</span>"
         runs = exporter.parse_inline(text)
