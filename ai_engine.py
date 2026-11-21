@@ -214,7 +214,15 @@ def get_client() -> genai.Client:
             "Clé Gemini introuvable. Ajoutez GEMINI_API_KEY dans .streamlit/secrets.toml "
             "(ou dans les secrets de votre hébergement Streamlit)."
         )
-    return genai.Client(api_key=api_key)
+    # Le SDK réessaie par défaut jusqu'à 5 fois (délais jusqu'à 60 s). L'app gère déjà
+    # les 503/429 : éviter la double pile de reprises, surtout depuis un PC derrière une box.
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            timeout=120_000,
+            retry_options=types.HttpRetryOptions(attempts=1),
+        ),
+    )
 
 
 def resolve_mime_type(audio_url: str, declared_type: str | None = None, header_type: str | None = None) -> str:
