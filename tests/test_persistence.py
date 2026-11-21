@@ -29,6 +29,16 @@ class PersistenceFileTests(unittest.TestCase):
         for name in ("EDITOS_PERSIST_PROVIDER", "EDITOS_PERSIST_BACKUP_PATH"):
             os.environ.pop(name, None)
 
+    def test_manual_export_import_roundtrip(self) -> None:
+        db.init_db()
+        db.add_show("https://example.com/only-manual.xml", title="Manuel")
+        bundle = persistence.export_bundle_bytes()
+        self.db_path.unlink(missing_ok=True)
+        persistence.import_bundle_bytes(bundle)
+        self.assertTrue(self.db_path.exists())
+        urls = [row["rss_url"] for row in db.list_shows()]
+        self.assertIn("https://example.com/only-manual.xml", urls)
+
     def test_ensure_backup_creates_archive(self) -> None:
         db.init_db()
         self.assertFalse(self.backup_path.exists())

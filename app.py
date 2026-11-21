@@ -1475,8 +1475,65 @@ def _render_persistence_status() -> None:
         render_html(f'<div class="callout callout-saved">{icon("check")}<span>{esc(text)}</span></div>')
 
 
+def render_manual_backup() -> None:
+    """Export / import d'une archive pour Streamlit Cloud ou copie ponctuelle."""
+    cloud = persistence.running_on_streamlit_cloud()
+    hint = (
+        "Avant de fermer l'onglet ou après une session sur Streamlit Cloud : téléchargez l'archive et "
+        "déposez-la dans Google Drive. Au réveil de l'app, réimportez le même fichier."
+        if cloud
+        else "Copie complète de votre base et des images de couverture (identique au fichier synchronisé sur Drive si vous l'avez configuré)."
+    )
+    section_title("download", "Copie de sécurité", hint)
+    with st.container(key="manual_backup_card"):
+        down_col, up_col = st.columns(2, gap="large")
+        with down_col:
+            st.caption("Téléchargement")
+            if st.button("Préparer la sauvegarde", icon=":material/folder_zip:", key="prep_backup", type="primary"):
+                with st.spinner("Création de l'archive…"):
+                    st.session_state["manual_backup_blob"] = persistence.export_bundle_bytes()
+            blob = st.session_state.get("manual_backup_blob")
+            if blob:
+                st.download_button(
+                    "Télécharger mes_editos_backup.tar.gz",
+                    data=blob,
+                    file_name="mes_editos_backup.tar.gz",
+                    mime="application/gzip",
+                    icon=":material/download:",
+                    type="primary",
+                    key="download_backup",
+                )
+        with up_col:
+            st.caption("Restauration (remplace les données actuelles de l'app)")
+            uploaded = st.file_uploader(
+                "Fichier .tar.gz précédemment téléchargé",
+                type=["gz"],
+                key="restore_backup_upload",
+                label_visibility="collapsed",
+                max_upload_size=50,
+            )
+            if uploaded is not None:
+                st.caption(f"{uploaded.name} · {uploaded.size / 1024:.1f} Ko")
+            if st.button(
+                "Restaurer cette sauvegarde",
+                icon=":material/restore:",
+                key="restore_backup_btn",
+                disabled=uploaded is None,
+                type="secondary",
+            ):
+                try:
+                    persistence.import_bundle_bytes(uploaded.getvalue())
+                except persistence.BackupImportError as exc:
+                    st.error(str(exc))
+                else:
+                    st.session_state.pop("manual_backup_blob", None)
+                    flash("Sauvegarde restaurée. Vos fiches et flux sont de nouveau disponibles.", ":material/restore:")
+                    st.rerun()
+
+
 def render_parametres() -> None:
     _render_persistence_status()
+    render_manual_backup()
     pending = st.session_state.pop("pending_sync", None)
     if pending is not None:
         show = db.get_show(pending)
