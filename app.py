@@ -28,6 +28,7 @@ import exporter
 import fiche_import
 import richtext_md as rt
 from streamlit_quill import st_quill
+import persistence
 import rss_fetcher
 import transcript_fetcher
 
@@ -1461,7 +1462,21 @@ def render_single_episodes() -> None:
                     st.rerun()
 
 
+def _render_persistence_status() -> None:
+    message = persistence.status_message()
+    if not message:
+        return
+    text, tone = message
+    if tone == "error":
+        st.error(text, icon=":material/cloud_off:")
+    elif tone == "warning":
+        st.warning(text, icon=":material/warning:")
+    else:
+        render_html(f'<div class="callout callout-saved">{icon("check")}<span>{esc(text)}</span></div>')
+
+
 def render_parametres() -> None:
+    _render_persistence_status()
     pending = st.session_state.pop("pending_sync", None)
     if pending is not None:
         show = db.get_show(pending)
@@ -1577,6 +1592,7 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
     st.html(STYLES_PATH)
+    persistence.restore_if_configured()
     db.init_db()
     ASSETS_DIR.mkdir(exist_ok=True)
     keep_widget_state()
@@ -1597,6 +1613,7 @@ def main() -> None:
             with tab:
                 render()
     show_flashes()
+    persistence.sync_if_dirty()
 
 
 if __name__ == "__main__":
