@@ -8,3 +8,4 @@ Pillow>=10.4
 pypdf>=5.0
 beautifulsoup4>=4.12
 streamlit-quill>=0.0.3
+boto3>=1.35

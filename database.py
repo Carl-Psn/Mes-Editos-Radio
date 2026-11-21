@@ -122,9 +122,18 @@ def connect() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
     try:
+        changes_before = conn.total_changes
         yield conn
         conn.commit()
+        if conn.total_changes > changes_before:
+            try:
+                import persistence
+
+                persistence.mark_dirty()
+            except ImportError:
+                pass
     except Exception:
         conn.rollback()
         raise

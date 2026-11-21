@@ -24,6 +24,7 @@ Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche ex
 | --- | --- |
 | `app.py` | Interface, onglets et état de session |
 | `database.py` | Base SQLite locale (`editos_insp.db`, créée au premier lancement) |
+| `persistence.py` | Sauvegarde / restauration distante (Cloud Streamlit) |
 | `rss_fetcher.py` | Lecture des flux RSS, exclusion des dimanches, synchronisation |
 | `ai_engine.py` | Fiches depuis la retranscription Radio France (défaut) ou l'audio, synthèse mensuelle (`google-genai`) |
 | `transcript_fetcher.py` | Extraction de la retranscription sur la page web de l'épisode |
@@ -35,6 +36,14 @@ Dans l'atelier de fichage, chaque épisode accepte aussi l'import d'une fiche ex
 
 ## À savoir
 
+- **Streamlit Community Cloud** : le disque de l'application est éphémère. Sans configuration
+  supplémentaire, la base SQLite (`editos_insp.db`), les images dans `assets/` et donc toutes les
+  fiches, flux RSS et épisodes ajoutés disparaissent après une mise en veille ou un redéploiement.
+  Configurez une section `[persistence]` dans les **secrets** de l'app (stockage S3 ou compatible
+  Cloudflare R2, etc.) — modèle dans `.streamlit/secrets.toml.example`. L'application restaure
+  automatiquement cette sauvegarde au réveil et l'actualise après chaque modification. En local ou
+  sur un serveur avec volume durable, vous pouvez aussi définir `EDITOS_DB_PATH` pour placer la
+  base hors du répertoire de l'app, ou `provider = "file"` avec un `backup_path` sur ce volume.
 - Les flux Radio France ne remontent que quelques semaines en arrière : l'historique se constitue
   dans la base locale au fil des synchronisations (automatique à l'ouverture, au plus une fois par
   heure, ou forcée depuis l'onglet Paramètres).
