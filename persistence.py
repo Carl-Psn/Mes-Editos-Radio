@@ -169,6 +169,41 @@ def _write_archive(target: Path) -> None:
             archive.add(path, arcname=arcname)
 
 
+def export_bundle_bytes() -> bytes:
+    """Archive prête à être téléchargée (base + images `assets/`)."""
+    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as handle:
+        path = Path(handle.name)
+    try:
+        _write_archive(path)
+        return path.read_bytes()
+    finally:
+        path.unlink(missing_ok=True)
+
+
+class BackupImportError(ValueError):
+    """Fichier de sauvegarde illisible ou incomplet."""
+
+
+def import_bundle_bytes(data: bytes) -> None:
+    """Restaure une archive téléchargée auparavant (remplace la base et les logos locaux)."""
+    if not data:
+        raise BackupImportError("Le fichier est vide.")
+    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as handle:
+        path = Path(handle.name)
+        handle.write(data)
+    try:
+        with tarfile.open(path, "r:gz") as archive:
+            names = {member.name for member in archive.getmembers() if not member.isdir()}
+        if "editos_insp.db" not in names:
+            raise BackupImportError("Archive invalide : pas de base editos_insp.db.")
+        _extract_archive(path)
+    except tarfile.TarError as exc:
+        raise BackupImportError(f"Archive illisible : {exc}") from exc
+    finally:
+        path.unlink(missing_ok=True)
+    mark_dirty()
+
+
 def _extract_archive(source: Path) -> None:
     if not source.exists() or source.stat().st_size == 0:
         return
@@ -307,8 +342,8 @@ def status_message() -> tuple[str, str] | None:
     if running_on_streamlit_cloud() and config is None:
         return (
             "Sur Streamlit Community Cloud, le disque de l'application est éphémère : fiches, flux RSS "
-            "et épisodes disparaissent après une mise en veille tant qu'une sauvegarde distante n'est pas "
-            "configurée. Ajoutez une section [persistence] dans les secrets (stockage S3 ou R2) — voir le README.",
+            "et épisodes disparaissent après une mise en veille tant qu'une sauvegarde n'est pas "
+            "téléchargée ou stockée (S3 dans les secrets, ou copie manuelle ci-dessous + Google Drive).",
             "warning",
         )
     if config and _last_sync_error:
