@@ -37,9 +37,8 @@ USER_AGENT = "EditosINSP/1.0 (+suivi personnel de podcasts)"
 
 FICHE_SECTIONS = (
     "1. Thèse centrale et problématique",
-    "2. Faits, chiffres précis et dates clés",
-    "3. Acteurs, institutions et rapports de force",
-    "4. Enjeux pour l'action publique et ouverture concours",
+    "2. Faits & chiffres clés",
+    "4. Enjeux pour l'action publique",
 )
 
 # Types MIME audio acceptés par Gemini, indexés par extension de fichier.
@@ -72,22 +71,17 @@ _SYSTEM_INSTRUCTION = (
     "européennes et internationales et pour l'oral. Tu n'inventes jamais un chiffre, une date ou une citation."
 )
 
-_FICHE_SECTIONS_PROMPT = """Structure obligatoire : exactement ces quatre parties, dans cet ordre, avec ces intitulés comme titres \
+_FICHE_SECTIONS_PROMPT = """Structure obligatoire : exactement ces trois parties, dans cet ordre, avec ces intitulés comme titres \
 Markdown de niveau 2 :
 
 ## {s1}
-La thèse défendue par le chroniqueur, formulée en deux ou trois phrases, puis la problématique qu'elle \
-soulève, rédigée sous forme de question.
+La thèse défendue par le chroniqueur, formulée en deux ou trois phrases.
 
 ## {s2}
 Liste à puces de tous les faits, chiffres, dates, textes et citations mentionnés dans la chronique, restitués \
 avec exactitude et avec leur unité ou leur source quand elle est donnée.
 
 ## {s3}
-Liste à puces des acteurs (personnalités, partis, États, entreprises, institutions, juridictions), de \
-leur position et des rapports de force qui les opposent ou les lient.
-
-## {s4}
 Ce que le sujet implique pour la décision et l'action publiques (leviers, contraintes juridiques et \
 budgétaires, arbitrages), puis une ouverture concours : notions et références à mobiliser, deux ou trois \
 sujets de composition ou questions d'oral auxquels cet édito peut servir d'accroche ou d'exemple.
@@ -95,10 +89,10 @@ sujets de composition ou questions d'oral auxquels cet édito peut servir d'accr
 Règles :
 - Appuie-toi d'abord sur la source fournie (retranscription ou audio). Si un élément est absent ou \
 incertain, signale-le par « (à vérifier) » au lieu de le deviner.
-- Les compléments qui viennent de tes connaissances et non de la chronique sont réservés à la partie 4 et \
+- Les compléments qui viennent de tes connaissances et non de la chronique sont réservés à la partie 3 et \
 introduits par « Pour aller plus loin : ».
 - Distingue les faits de l'opinion du chroniqueur.
-- Mise en forme Markdown sobre : titres de niveau 2 pour les quatre parties, listes à puces avec « - », \
+- Mise en forme Markdown sobre : titres de niveau 2 pour les trois parties, listes à puces avec « - », \
 gras pour les notions clés. Pas de tableau, pas de bloc de code, pas d'émoji.
 - Commence directement par le premier titre, sans introduction ni conclusion hors plan.
 """
