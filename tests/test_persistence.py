@@ -29,6 +29,12 @@ class PersistenceFileTests(unittest.TestCase):
         for name in ("EDITOS_PERSIST_PROVIDER", "EDITOS_PERSIST_BACKUP_PATH"):
             os.environ.pop(name, None)
 
+    def test_ensure_backup_creates_archive(self) -> None:
+        db.init_db()
+        self.assertFalse(self.backup_path.exists())
+        persistence.ensure_backup()
+        self.assertTrue(self.backup_path.exists())
+
     def test_roundtrip_restores_shows(self) -> None:
         db.init_db()
         rss = "https://example.com/podcast/feed.xml"

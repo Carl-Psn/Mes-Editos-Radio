@@ -61,7 +61,7 @@ def _config_from_mapping(data: dict[str, Any]) -> PersistenceConfig | None:
         backup = data.get("backup_path") or data.get("path")
         if not backup:
             raise ValueError("Persistance « file » : renseignez backup_path dans [persistence].")
-        return PersistenceConfig(provider="file", backup_path=Path(str(backup)))
+        return PersistenceConfig(provider="file", backup_path=Path(str(backup)).expanduser())
 
     bucket = data.get("bucket")
     key = data.get("object_key") or data.get("key")
@@ -252,6 +252,18 @@ def restore_if_configured() -> bool:
     return True
 
 
+def ensure_backup() -> None:
+    """Crée une première archive sur disque si la base existe déjà mais pas le fichier de sauvegarde."""
+    try:
+        config = load_config()
+    except ValueError:
+        return
+    if config is None or config.provider != "file" or config.backup_path is None:
+        return
+    if _db_path().exists() and not config.backup_path.exists():
+        sync_if_dirty(force=True)
+
+
 def sync_if_dirty(*, force: bool = False) -> bool:
     """Envoie une sauvegarde si la base a été modifiée depuis la dernière synchronisation."""
     global _dirty, _last_sync_error
@@ -274,6 +286,7 @@ def sync_if_dirty(*, force: bool = False) -> bool:
             _write_archive(bundle)
             if config.provider == "file":
                 assert config.backup_path is not None
+                config.backup_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(bundle, config.backup_path)
             else:
                 _upload_to_s3(config, bundle)
@@ -301,6 +314,9 @@ def status_message() -> tuple[str, str] | None:
     if config and _last_sync_error:
         return (f"Dernière sauvegarde en échec : {_last_sync_error}", "error")
     if config and persistence_enabled():
-        label = "fichier local" if config.provider == "file" else f"S3 · {config.bucket}/{config.object_key}"
+        if config.provider == "file" and config.backup_path is not None:
+            label = str(config.backup_path)
+        else:
+            label = f"S3 · {config.bucket}/{config.object_key}"
         return (f"Sauvegarde automatique activée ({label}).", "ok")
     return None

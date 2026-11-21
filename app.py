@@ -1613,6 +1613,7 @@ def main() -> None:
             with tab:
                 render()
     show_flashes()
+    persistence.ensure_backup()
     persistence.sync_if_dirty()
 
 
