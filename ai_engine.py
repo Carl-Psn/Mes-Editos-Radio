@@ -315,6 +315,14 @@ def _response_text(response: types.GenerateContentResponse) -> str:
     raise AIEngineError(f"Gemini n'a renvoyé aucun texte{detail}.")
 
 
+def _generation_config() -> types.GenerateContentConfig:
+    """Réglages d'appel Gemini pour les fiches et synthèses (réflexion désactivée pour limiter la latence)."""
+    return types.GenerateContentConfig(
+        system_instruction=_SYSTEM_INSTRUCTION,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+    )
+
+
 def _api_error_message(exc: genai_errors.APIError) -> str:
     code = getattr(exc, "code", None)
     message = getattr(exc, "message", None) or str(exc)
@@ -395,10 +403,19 @@ def _generate_fiche_from_transcript(
         transcript = transcript_fetcher.fetch_transcript(link)
     except transcript_fetcher.TranscriptError as exc:
         raise AIEngineError(str(exc)) from exc
-    notify(f"Retranscription récupérée ({len(transcript):,} caractères). Rédaction de la fiche…".replace(",", " "))
+    size = len(transcript)
+    notify(
+        f"Retranscription récupérée ({size} caractères). "
+        "Appel à Gemini… (en général 30 s à 2 min ; jusqu'à 5 min si Google est saturé et relance plusieurs fois)."
+    )
+    if size > 20_000:
+        notify(
+            "Retranscription inhabituellement longue : la génération sera plus lente. "
+            "Si le délai dépasse 5 min, essayez une resynchronisation du flux."
+        )
     ctx = _episode_context(episode)
     prompt = _FICHE_PROMPT_TRANSCRIPT.format(transcript=transcript, **ctx)
-    config = types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION)
+    config = _generation_config()
     try:
         response = _generate_content_with_retries(
             client, model=model or DEFAULT_MODEL, contents=prompt, config=config, on_step=notify
@@ -434,7 +451,7 @@ def _generate_fiche_from_audio(
 
         notify("Rédaction de la fiche à partir de l'audio (plusieurs minutes)…")
         prompt = _FICHE_PROMPT_AUDIO.format(**_episode_context(episode))
-        config = types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION)
+        config = _generation_config()
         response = _generate_content_with_retries(
             client,
             model=model or DEFAULT_MODEL,
@@ -485,7 +502,7 @@ def generate_monthly_synthesis(month_label: str, episodes: list[dict[str, Any]],
     prompt = _SYNTHESIS_PROMPT.format(
         month_label=month_label, count=len(episodes), corpus=build_month_corpus(episodes)
     )
-    config = types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION)
+    config = _generation_config()
     try:
         response = _generate_content_with_retries(
             client, model=model or DEFAULT_MODEL, contents=prompt, config=config
