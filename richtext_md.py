@@ -59,6 +59,18 @@ def _html_text(text: str) -> str:
     return html.escape(text, quote=False)
 
 
+def leading_indent_level(leading: str) -> int:
+    """Niveau de puce (0–2) à partir des espaces en tête de ligne (2 ou 4 espaces par niveau)."""
+    spaces = len((leading or "").expandtabs(4))
+    if spaces >= 8:
+        return 2
+    if spaces >= 4:
+        return 1
+    if spaces >= 2:
+        return 1
+    return 0
+
+
 def normalize_color(value: str) -> str:
     value = (value or "").strip()
     if not value:
@@ -131,14 +143,16 @@ def markdown_to_html(markdown: str) -> str:
             continue
 
         bullet = re.match(r"^(\s*)[-*+•]\s+(.*)$", line)
-        if bullet and not stripped.startswith("**"):
+        if bullet:
             flush_para()
-            indent = len(bullet.group(1).expandtabs(4))
-            level = min(indent // 4, 2)
+            level = leading_indent_level(bullet.group(1))
+            indent_class = f' class="ql-indent-{level}"' if level else ""
             if not in_list:
                 blocks.append("<ul>")
                 in_list = True
-            blocks.append(f'<li data-indent="{level}">{_inline_html(bullet.group(2).strip())}</li>')
+            blocks.append(
+                f'<li data-indent="{level}"{indent_class}>{_inline_html(bullet.group(2).strip())}</li>'
+            )
             continue
 
         if stripped.startswith(">"):
@@ -240,8 +254,8 @@ def _block_to_markdown(node: Tag, blocks: list[str]) -> None:
         blocks.append(text)
 
 
-def _list_item_to_markdown(node: Tag, blocks: list[str]) -> None:
-    indent = _li_indent(node)
+def _list_item_to_markdown(node: Tag, blocks: list[str], depth: int | None = None) -> None:
+    indent = depth if depth is not None else _li_indent(node)
     text = "".join(_inline_to_markdown(child) for child in node.children if not isinstance(child, Tag) or child.name.lower() != "ul").strip()
     # Nested sublists inside the same <li>.
     for child in node.children:
@@ -251,9 +265,14 @@ def _list_item_to_markdown(node: Tag, blocks: list[str]) -> None:
                 text = ""
             for sub in child.children:
                 if isinstance(sub, Tag) and sub.name.lower() == "li":
-                    _list_item_to_markdown(sub, blocks)
+                    _list_item_to_markdown(sub, blocks, depth=min(indent + 1, 2))
             return
     blocks.append(f"{'    ' * indent}- {text}" if text else f"{'    ' * indent}-")
+
+
+def _is_list_line(line: str) -> bool:
+    stripped = line.lstrip()
+    return bool(re.match(r"^[-*+•]\s", stripped)) or line.startswith(("    ", "\t"))
 
 
 def html_to_markdown(fragment: str) -> str:
@@ -278,7 +297,13 @@ def html_to_markdown(fragment: str) -> str:
             cleaned.append(piece)
         else:
             cleaned.append(piece.strip())
-    return unescape_text("\n\n".join(cleaned))
+    merged: list[str] = []
+    for piece in cleaned:
+        if merged and _is_list_line(piece) and _is_list_line(merged[-1]):
+            merged[-1] = f"{merged[-1]}\n{piece}"
+        else:
+            merged.append(piece)
+    return unescape_text("\n\n".join(merged))
 
 
 def preview_html(markdown: str) -> str:

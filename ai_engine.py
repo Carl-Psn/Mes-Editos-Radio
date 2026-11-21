@@ -102,9 +102,10 @@ incertain, signale-le par « (à vérifier) » au lieu de le deviner.
 - Les compléments qui viennent de tes connaissances et non de la chronique sont réservés à la partie 3 et \
 introduits par « Pour aller plus loin : » dans les sous-puces concernées.
 - Distingue les faits de l'opinion du chroniqueur.
-- Mise en forme Markdown sobre : titres de niveau 2 pour les trois parties, listes à puces avec « - », \
-sous-puces indentées de deux espaces ; **Notions liées**, **Références à mobiliser** et **Sujets possibles** \
-exactement en gras comme ci-dessus. Pas de tableau, pas de bloc de code, pas d'émoji.
+- Mise en forme Markdown sobre : titres de niveau 2 pour les trois parties, listes à puces avec « - » ; \
+sous-puces en retraitant de 2 espaces (ou 4) après la puce parente ; **Notions liées**, **Références à mobiliser** \
+et **Sujets possibles** en gras comme rubriques de premier niveau, chaque élément détaillé en sous-puce indentée. \
+Pas de tableau, pas de bloc de code, pas d'émoji.
 - Commence directement par le premier titre, sans introduction ni conclusion hors plan.
 """
 
