@@ -36,7 +36,7 @@ FILE_READY_TIMEOUT = 300
 USER_AGENT = "EditosINSP/1.0 (+suivi personnel de podcasts)"
 
 FICHE_SECTIONS = (
-    "1. Thèse centrale et problématique",
+    "1. Thèse centrale",
     "2. Faits & chiffres clés",
     "3. Enjeux pour l'action publique",
 )
@@ -75,8 +75,7 @@ _FICHE_SECTIONS_PROMPT = """Structure obligatoire : exactement ces trois parties
 Markdown de niveau 2 :
 
 ## {s1}
-La thèse défendue par le chroniqueur, formulée en deux ou trois phrases, puis la problématique qu'elle \
-soulève, rédigée sous forme de question.
+La thèse défendue par le chroniqueur, formulée en deux ou trois phrases.
 
 ## {s2}
 Liste à puces de tous les faits, chiffres, dates, textes et citations mentionnés dans la chronique, restitués \
