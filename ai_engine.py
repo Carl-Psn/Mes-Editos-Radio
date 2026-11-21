@@ -38,7 +38,7 @@ USER_AGENT = "EditosINSP/1.0 (+suivi personnel de podcasts)"
 FICHE_SECTIONS = (
     "1. Thèse centrale et problématique",
     "2. Faits & chiffres clés",
-    "4. Enjeux pour l'action publique",
+    "3. Enjeux pour l'action publique",
 )
 
 # Types MIME audio acceptés par Gemini, indexés par extension de fichier.
@@ -75,25 +75,36 @@ _FICHE_SECTIONS_PROMPT = """Structure obligatoire : exactement ces trois parties
 Markdown de niveau 2 :
 
 ## {s1}
-La thèse défendue par le chroniqueur, formulée en deux ou trois phrases.
+La thèse défendue par le chroniqueur, formulée en deux ou trois phrases, puis la problématique qu'elle \
+soulève, rédigée sous forme de question.
 
 ## {s2}
 Liste à puces de tous les faits, chiffres, dates, textes et citations mentionnés dans la chronique, restitués \
 avec exactitude et avec leur unité ou leur source quand elle est donnée.
 
 ## {s3}
-Ce que le sujet implique pour la décision et l'action publiques (leviers, contraintes juridiques et \
-budgétaires, arbitrages), puis une ouverture concours : notions et références à mobiliser, deux ou trois \
-sujets de composition ou questions d'oral auxquels cet édito peut servir d'accroche ou d'exemple.
+Un court paragraphe sur ce que le sujet implique pour la décision et l'action publiques (leviers, contraintes \
+juridiques et budgétaires, arbitrages), puis une liste à puces structurée ainsi (respecte exactement cette \
+hiérarchie Markdown) :
+
+- **Notions liées**
+  - (chaque notion en sous-puce, indentation de niveau 2)
+- **Références à mobiliser**
+  - (chacune en sous-puce, indentation de niveau 2 ; textes, auteurs, décisions, rapports)
+- **Sujets possibles**
+  - (deux ou trois sujets de composition ou questions d'oral en sous-puces, indentation de niveau 2)
 
 Règles :
+- Longueur : la fiche doit tenir sur une seule page (environ 450 à 550 mots) : style dense, aucune redondance, \
+listes concises.
 - Appuie-toi d'abord sur la source fournie (retranscription ou audio). Si un élément est absent ou \
 incertain, signale-le par « (à vérifier) » au lieu de le deviner.
 - Les compléments qui viennent de tes connaissances et non de la chronique sont réservés à la partie 3 et \
-introduits par « Pour aller plus loin : ».
+introduits par « Pour aller plus loin : » dans les sous-puces concernées.
 - Distingue les faits de l'opinion du chroniqueur.
 - Mise en forme Markdown sobre : titres de niveau 2 pour les trois parties, listes à puces avec « - », \
-gras pour les notions clés. Pas de tableau, pas de bloc de code, pas d'émoji.
+sous-puces indentées de deux espaces ; **Notions liées**, **Références à mobiliser** et **Sujets possibles** \
+exactement en gras comme ci-dessus. Pas de tableau, pas de bloc de code, pas d'émoji.
 - Commence directement par le premier titre, sans introduction ni conclusion hors plan.
 """
 
@@ -133,7 +144,6 @@ def _fiche_sections_block() -> str:
         s1=FICHE_SECTIONS[0],
         s2=FICHE_SECTIONS[1],
         s3=FICHE_SECTIONS[2],
-        s4=FICHE_SECTIONS[3],
     )
 
 
